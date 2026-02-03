@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CertificateStatus {
+  AKTIF
+  DALAM_PROSES
+  BERMASALAH
+  TIDAK_AKTIF
+}
+
+enum ApplicationStatus {
+  DIAJUKAN
+  DIPROSES
+  PERBAIKAN_BERKAS
+  DITOLAK
+  SELESAI
+}
+
+model Person {
+  id             String @id @default(uuid()) @db.Uuid
+  wallet_address String @unique @db.VarChar(50)
+
+  name     String @db.VarChar(150)
+  username String @unique @db.VarChar(100)
+  nik      String @unique @db.VarChar(150)
+  address  String @db.Text
+  phone    String @db.VarChar(100)
+  email    String @unique @db.VarChar(150)
+
+  nonce     String   @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  DeedOwner    Deed[]        @relation("DeedOwner")
+  DeedCreator  Deed[]        @relation("DeedCreator")
+  certificates Certificate[]
+  applications Application[]
+
+  @@map("persons")
+}
+
+model Land {
+  id        String @id @default(uuid()) @db.Uuid
+  area_size String @db.VarChar(100)
+  address   String @db.Text
+
+  north_boundary String @db.VarChar(100)
+  south_boundary String @db.VarChar(100)
+  west_boundary  String @db.VarChar(100)
+  east_boundary  String @db.VarChar(100)
+  latitude       String @db.VarChar(100)
+  longitude      String @db.VarChar(100)
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @default(now())
+  certificates Certificate[]
+  applications Application[]
+
+  @@map("lands")
+}
+
+model Certificate {
+  id        String             @id @default(uuid()) @db.Uuid
+  number    String             @unique @db.VarChar(100)
+  land_id   String             @db.Uuid
+  owner_id  String             @db.Uuid
+  cid       String             @db.VarChar(255)
+  status    CertificateStatus?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @default(now())
+
+  land  Land   @relation(fields: [land_id], references: [id])
+  owner Person @relation(fields: [owner_id], references: [id])
+
+  @@map("cerfiticates")
+}
+
+model Deed {
+  id          String @id @default(uuid()) @db.Uuid
+  number      String @unique @db.VarChar(100)
+  description String @db.VarChar(150)
+  cid         String @db.VarChar(255)
+
+  person_id String @db.Uuid
+  createdBy String @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   Person @relation("DeedOwner", fields: [person_id], references: [id])
+  creator Person @relation("DeedCreator", fields: [createdBy], references: [id])
+
+  @@map("deeds")
+}
+
+model Application {
+  id        String            @id @default(uuid()) @db.Uuid
+  person_id String            @db.Uuid
+  land_id   String            @db.Uuid
+  status    ApplicationStatus @default(DIAJUKAN)
+  type      String
+  notes     String            @db.VarChar(200)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @default(now())
+
+  land                 Land                  @relation(fields: [land_id], references: [id])
+  person               Person                @relation(fields: [person_id], references: [id])
+  applicationDocuments ApplicationDocument[]
+
+  @@map("applications")
+}
+
+model ApplicationDocument {
+  id             String   @id @default(uuid()) @db.Uuid
+  application_id String   @db.Uuid
+  cid            String   @db.VarChar(255)
+  description    String   @db.VarChar(150)
+  createdAt      DateTime @default(now())
+
+  application Application @relation(fields: [application_id], references: [id])
+
+  @@map("application_documents")
+}
