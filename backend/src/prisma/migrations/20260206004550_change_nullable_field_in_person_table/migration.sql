@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "persons" ALTER COLUMN "wallet_address" DROP NOT NULL,
+ALTER COLUMN "nik" DROP NOT NULL,
+ALTER COLUMN "address" DROP NOT NULL,
+ALTER COLUMN "phone" DROP NOT NULL;

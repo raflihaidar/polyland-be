@@ -22,18 +22,25 @@ enum ApplicationStatus {
   SELESAI
 }
 
+enum Section {
+  DASHBOARD
+  MASTER
+  SETTING
+}
+
 model Person {
-  id             String @id @default(uuid()) @db.Uuid
-  wallet_address String @unique @db.VarChar(50)
+  id             String  @id @default(uuid()) @db.Uuid
+  wallet_address String? @unique @db.VarChar(50)
 
-  name     String @db.VarChar(150)
-  username String @unique @db.VarChar(100)
-  nik      String @unique @db.VarChar(150)
-  address  String @db.Text
-  phone    String @db.VarChar(100)
-  email    String @unique @db.VarChar(150)
+  name     String  @db.VarChar(150)
+  username String  @unique @db.VarChar(100)
+  password String  @db.VarChar(100)
+  nik      String? @unique @db.VarChar(150)
+  address  String? @db.Text
+  phone    String? @db.VarChar(100)
+  email    String  @unique @db.VarChar(150)
 
-  nonce     String   @db.VarChar(100)
+  nonce     String?  @db.VarChar(100)
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
 
@@ -41,6 +48,7 @@ model Person {
   DeedCreator  Deed[]        @relation("DeedCreator")
   certificates Certificate[]
   applications Application[]
+  roles        RolePerson[]
 
   @@map("persons")
 }
@@ -126,4 +134,72 @@ model ApplicationDocument {
   application Application @relation(fields: [application_id], references: [id])
 
   @@map("application_documents")
+}
+
+model Module {
+  id          Int          @id @default(autoincrement())
+  name        String       @db.VarChar(50)
+  slug        String       @unique @db.VarChar(50)
+  description String?
+  section     String?
+  privileges  Privilege[]
+  groupId     Int?         @map("group_id")
+  moduleGroup ModuleGroup? @relation(fields: [groupId], references: [id])
+
+  @@map("modules")
+}
+
+model ModuleGroup {
+  id      Int      @id @default(autoincrement())
+  name    String   @unique @db.VarChar(50)
+  slug    String   @unique @db.VarChar(100)
+  section Section
+  modules Module[]
+
+  @@map("module_groups")
+}
+
+model Role {
+  id          Int             @id @default(autoincrement())
+  name        String          @unique
+  description String?
+  created_at  DateTime        @default(now())
+  privileges  RolePrivilege[]
+  rolePersons RolePerson[]
+
+  @@map("roles")
+}
+
+model Privilege {
+  id        Int             @id @default(autoincrement())
+  name      String          @db.VarChar(50)
+  module_id Int
+  action    String
+  module    Module          @relation(fields: [module_id], references: [id])
+  roles     RolePrivilege[]
+
+  @@map("privileges")
+}
+
+model RolePrivilege {
+  id           Int       @id @default(autoincrement())
+  role_id      Int
+  privilege_id Int
+  created_at   DateTime  @default(now())
+  role         Role      @relation(fields: [role_id], references: [id])
+  privilege    Privilege @relation(fields: [privilege_id], references: [id])
+
+  @@unique([role_id, privilege_id])
+  @@map("role_privileges")
+}
+
+model RolePerson {
+  id         Int      @id @default(autoincrement())
+  role_id    Int
+  person_id  String   @db.Uuid
+  created_at DateTime @default(now())
+  person     Person   @relation(fields: [person_id], references: [id])
+  role       Role     @relation(fields: [role_id], references: [id])
+
+  @@map("role_persons")
 }

@@ -1,12 +1,17 @@
 import express from "express";
 import "dotenv/config";
 import { PinataSDK } from "pinata";
-import { Blob, File } from "buffer";
+import { File } from "buffer";
+import authRouter from "./routes/auth.route";
+import cookieParser from "cookie-parser";
 
 const app = express();
 const port = process.env.APP_PORT || 8000;
 
 app.use(express.json());
+app.use(cookieParser());
+
+app.use("/api/auth", authRouter);
 
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,

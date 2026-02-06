@@ -3,30 +3,41 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "server": "nodemon backend/src/app.ts"
+    "dev": "npx nodemon --exec \"tsx\" backend/src/app.ts"
+  },
+  "prisma": {
+    "seed": "tsx backend/src/prisma/seeds/seed.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.0.5",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.1",
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.5",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.19.7",
     "@types/pg": "^8.16.0",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
     "hardhat": "^3.0.15",
     "nodemon": "^3.1.11",
     "prisma": "^7.3.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.8.0",
-    "viem": "^2.39.0"
+    "viem": "^2.45.1"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "@types/bcrypt": "^6.0.0",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.18.0",
     "pinata": "^2.5.1",
+    "redis": "^5.10.0",
     "ts-node": "^10.9.2"
   }
 }
