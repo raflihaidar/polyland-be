@@ -2,16 +2,28 @@ import express from "express";
 import "dotenv/config";
 import { PinataSDK } from "pinata";
 import { File } from "buffer";
+import cors from "cors";
 import authRouter from "./routes/auth.route";
+import mitraRouter from "./routes/mitra.route";
 import cookieParser from "cookie-parser";
-
+import { errorHandler } from "./middlewares/errorHandler";
 const app = express();
 const port = process.env.APP_PORT || 8000;
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(
+  cors({
+    origin: process.env.FE_URL,
+    credentials: true,
+  }),
+);
 
 app.use("/api/auth", authRouter);
+app.use("/api/mitra", mitraRouter);
+
+// Error handling
+app.use(errorHandler);
 
 const pinata = new PinataSDK({
   pinataJwt: process.env.PINATA_JWT,

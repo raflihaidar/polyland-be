@@ -1,86 +1,128 @@
 import * as AuthService from "../services/auth.service";
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
+import { AppError } from "../utils/error";
 import bcrypt from "bcrypt";
 
-export const register = async (req: Request, res: Response) => {
+export const register = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const { name, username, email, password, confirmPassword } = req.body;
+    console.log("body yang dikirim fe : ", req.body);
     if (!name || !username || !email || !password || !confirmPassword) {
-      return res.status(400).json({ error: "Missing required fields" });
+      throw new AppError("Semua field wajib diisi", 400);
     }
+
     if (password !== confirmPassword) {
-      return res.status(400).json({ error: "Passwords do not match" });
+      throw new AppError("Password dan konfirmasi password tidak sama", 400);
     }
+
     const result = await AuthService.register({
       name,
       email,
       password,
       username,
     });
-    res.status(201).json(result);
+    res.status(201).json({
+      status: "success",
+      message: "Register User Success",
+      data: result,
+    });
   } catch (error: unknown) {
-    console.error(error);
+    next(error);
   }
 };
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(401).json({ message: "Email or password is missing" });
+      throw new AppError("Email dan password tidak boleh kosong", 400);
     }
 
     const { accessToken, refreshToken, person } =
       await AuthService.login(email);
 
+    if (!person) {
+      throw new AppError("User tidak ditemukan", 404);
+    }
+
     // Cek password
     const isMatch = await bcrypt.compare(password, person.password);
 
     if (!isMatch) {
-      return res.status(401).json({ message: "Email atau password salah" });
+      throw new AppError("Email atau password salah", 400);
     }
 
     res
+      .status(200)
       .cookie("access_token", accessToken, {
         httpOnly: true,
+        sameSite: "lax",
         secure: false,
-        sameSite: "none",
       })
       .cookie("refresh_token", refreshToken, {
         httpOnly: true,
+        sameSite: "lax",
         secure: false,
-        sameSite: "none",
       })
-      .json({ message: "Login success", token: accessToken });
+      .json({ status: "success", message: "Login success" });
   } catch (error) {
-    res.status(500).json({ error: "Internal server error" });
+    next(error);
   }
 };
 
 export const requestWalletNonceHandler = async (
   req: Request,
   res: Response,
+  next: NextFunction,
 ) => {
   try {
     const { walletAddress } = req.body;
     const result = await AuthService.requestWalletNonce(walletAddress);
-    res.json(result);
+    res.status(200).json({
+      status: "success",
+      message: "Nonce wallet berhasil dibuat",
+      data: result,
+    });
   } catch (error: unknown) {
-    res.status(500).json({ error: "Internal server error" });
+    next(error);
   }
 };
 
-export const loginWalletVerifyHandler = async (req: Request, res: Response) => {
+export const loginWalletVerifyHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const { walletAddress, signature } = req.body;
-    const result = await AuthService.loginWalletVerify(
+    const { accessToken, refreshToken } = await AuthService.loginWalletVerify(
       walletAddress,
       signature,
     );
-    res.json(result);
+    res
+      .status(200)
+      .cookie("access_token", accessToken, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+      })
+      .cookie("refresh_token", refreshToken, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+      })
+      .json({ status: "success", message: "Login degan wallet sukses" });
   } catch (error: unknown) {
-    res.status(500).json({ error: "Internal server error" });
+    next();
   }
 };
 
@@ -108,17 +150,16 @@ export const refresh = async (req: Request, res: Response) => {
       access_token: accessToken,
     });
   } catch (err: any) {
-    return res.status(403).json({
-      message: "Refresh token tidak valid atau expired",
-    });
+    throw new AppError("Refresh token tidak valid atau expired", 403);
   }
 };
 
 export const user = async (req: Request, res: Response) => {
   const user = req.person;
+  const data = await AuthService.getUser(user.id);
   return res.status(200).json({
     message: "User retrieved successfully",
-    user,
+    data,
   });
 };
 
@@ -137,5 +178,5 @@ export const logout = async (req: Request, res: Response) => {
     path: "/",
   });
 
-  res.json({ status: "success", message: "Logout berhasil" });
+  res.status(200).json({ status: "success", message: "Logout berhasil" });
 };

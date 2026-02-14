@@ -15,8 +15,6 @@ export async function authentication(
 
     const token = req.cookies?.access_token;
 
-    console.log(req.cookies);
-
     if (!token) {
       req.person = null;
       return res.status(401).json({ message: "No access token" });

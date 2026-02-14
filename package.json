@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npx nodemon --exec \"tsx\" backend/src/app.ts"
+    "dev": "npx nodemon --exec \"tsx\" backend/src/app.ts",
+    "service" : "sudo systemctl start postgresql && sudo systemctl start redis"
   },
   "prisma": {
     "seed": "tsx backend/src/prisma/seeds/seed.ts"
@@ -29,6 +30,7 @@
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
