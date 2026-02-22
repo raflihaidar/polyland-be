@@ -18,9 +18,9 @@ export const seedModules = async (prisma: PrismaClient) => {
     // Dashboard
     { name: "Dashboard", slug: "dashboard", section: "DASHBOARD" },
 
-    { name: "Swaploting", slug: "swaploting", section: "Layanan" },
+    // { name: "Swaploting", slug: "swaploting", section: "Layanan" },
     { name: "Cari Berkas", slug: "cari-berkas", section: "Layanan" },
-    { name: "Antrian Online", slug: "antrian-online", section: "Layanan" },
+    { name: "Peralihan Hak", slug: "peralihan-hak", section: "Layanan" },
     { name: "Mitra Kerja", slug: "mitra-kerja", section: "Layanan" },
     { name: "Sertipikatku", slug: "sertipikatku", section: "Layanan" },
     { name: "Aktaku", slug: "aktaku", section: "Layanan" },

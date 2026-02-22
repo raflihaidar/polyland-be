@@ -15,9 +15,10 @@ enum CertificateStatus {
 }
 
 enum ApplicationStatus {
-  DIAJUKAN
   DIPROSES
-  PERBAIKAN_BERKAS
+  VERIFIKASI_BERKAS
+  PROSES_PENGUKURAN
+  PENANDATANGANAN
   DITOLAK
   SELESAI
 }
@@ -28,42 +29,84 @@ enum Section {
   SETTING
 }
 
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Gender {
+  LAKI_LAKI
+  PEREMPUAN
+}
+
+enum DocumentType {
+  KTP_PEMBELI
+  KTP_PENJUAL
+  KK_PEMBELI
+  AKTA_JUAL_BELI
+  PBB
+  SPPT
+  SERTIFIKAT_TANAH
+}
+
+enum CertificateType {
+  SHM // Sertifikat Hak Milik
+  SHGB // Sertifikat Hak Guna Bangunan
+  SHGU // Sertifikat Hak Guna Usaha
+}
+
 model Person {
   id             String  @id @default(uuid()) @db.Uuid
   wallet_address String? @unique @db.VarChar(50)
 
-  name     String? @db.VarChar(150)
+  name       String?   @db.VarChar(150)
+  nik        String?   @unique @db.VarChar(20)
+  phone      String?   @db.VarChar(20)
+  birthPlace String?   @db.VarChar(100)
+  birthDate  DateTime?
+  gender     Gender?
+  address    String?   @db.Text
+
+  isVerified Boolean   @default(false)
+  verifiedAt DateTime?
+
+  email    String? @unique @db.VarChar(150)
   username String? @unique @db.VarChar(100)
   password String? @db.VarChar(100)
-  nik      String? @unique @db.VarChar(150)
-  address  String? @db.Text
-  phone    String? @db.VarChar(100)
-  email    String? @unique @db.VarChar(150)
 
   nonce     String?  @db.VarChar(100)
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  DeedOwner    Deed[]        @relation("DeedOwner")
-  DeedCreator  Deed[]        @relation("DeedCreator")
-  certificates Certificate[]
-  applications Application[]
-  roles        RolePerson[]
+  accountVerifications AccountVerification[]
+  verifiedAccounts     AccountVerification[] @relation("VerificationApprover")
+  certificates         Certificate[]
+  DeedOwner            Deed[]                @relation("DeedOwner")
+  DeedCreator          Deed[]                @relation("DeedCreator")
+  applications         Application[]
+  roles                RolePerson[]
 
   @@map("persons")
 }
 
 model Land {
-  id        String @id @default(uuid()) @db.Uuid
-  area_size String @db.VarChar(100)
-  address   String @db.Text
+  id             String  @id @default(uuid()) @db.Uuid
+  area_size      String? @db.VarChar(100)
+  street_address String  @db.Text
+  rt             String  @db.VarChar(50)
+  rw             String  @db.VarChar(50)
+  ward           String  @db.VarChar(100)
+  subdistrict    String  @db.VarChar(100)
+  regency        String  @db.VarChar(100)
+  province       String  @db.VarChar(100)
 
-  north_boundary String @db.VarChar(100)
-  south_boundary String @db.VarChar(100)
-  west_boundary  String @db.VarChar(100)
-  east_boundary  String @db.VarChar(100)
-  latitude       String @db.VarChar(100)
-  longitude      String @db.VarChar(100)
+  north_boundary String? @db.VarChar(100)
+  south_boundary String? @db.VarChar(100)
+  west_boundary  String? @db.VarChar(100)
+  east_boundary  String? @db.VarChar(100)
+  latitude       String? @db.VarChar(100)
+  longitude      String? @db.VarChar(100)
 
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @default(now())
@@ -80,13 +123,14 @@ model Certificate {
   owner_id  String             @db.Uuid
   cid       String             @db.VarChar(255)
   status    CertificateStatus?
+  type      CertificateType
   createdAt DateTime           @default(now())
   updatedAt DateTime           @default(now())
 
   land  Land   @relation(fields: [land_id], references: [id])
   owner Person @relation(fields: [owner_id], references: [id])
 
-  @@map("cerfiticates")
+  @@map("certificates")
 }
 
 model Deed {
@@ -111,11 +155,12 @@ model Application {
   id        String            @id @default(uuid()) @db.Uuid
   person_id String            @db.Uuid
   land_id   String            @db.Uuid
-  status    ApplicationStatus @default(DIAJUKAN)
-  type      String
-  notes     String            @db.VarChar(200)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @default(now())
+  status    ApplicationStatus @default(DIPROSES)
+  type      CertificateType
+
+  notes     String?  @db.VarChar(200)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
 
   land                 Land                  @relation(fields: [land_id], references: [id])
   person               Person                @relation(fields: [person_id], references: [id])
@@ -125,13 +170,20 @@ model Application {
 }
 
 model ApplicationDocument {
-  id             String   @id @default(uuid()) @db.Uuid
-  application_id String   @db.Uuid
-  cid            String   @db.VarChar(255)
-  description    String   @db.VarChar(150)
-  createdAt      DateTime @default(now())
+  id             String @id @default(uuid()) @db.Uuid
+  application_id String @db.Uuid
 
-  application Application @relation(fields: [application_id], references: [id])
+  type DocumentType
+
+  fileUrl  String  @db.VarChar(255)
+  fileName String  @db.VarChar(255)
+  mimeType String  @db.VarChar(100)
+  fileSize Int
+  fileHash String? @db.VarChar(128)
+
+  createdAt DateTime @default(now())
+
+  application Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
 
   @@map("application_documents")
 }
@@ -203,4 +255,38 @@ model RolePerson {
 
   @@unique([person_id, role_id])
   @@map("role_persons")
+}
+
+model AccountVerification {
+  id String @id @default(uuid()) @db.Uuid
+
+  person_id String @db.Uuid
+  person    Person @relation(fields: [person_id], references: [id])
+
+  // Draft data pengajuan
+  fullName   String   @db.VarChar(150)
+  nik        String   @db.VarChar(20)
+  phone      String   @db.VarChar(20)
+  birthPlace String   @db.VarChar(100)
+  birthDate  DateTime
+  gender     Gender
+  address    String   @db.Text
+
+  // ktpPhotoUrl String
+  // selfiePhotoUrl String
+  // signatureUrl String
+
+  status          VerificationStatus @default(PENDING)
+  rejectionReason String?            @db.Text
+
+  verifiedBy String? @db.Uuid
+  verifier   Person? @relation("VerificationApprover", fields: [verifiedBy], references: [id])
+
+  verifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@map("account_verifications")
 }

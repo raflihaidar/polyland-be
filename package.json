@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "npx nodemon --exec \"tsx\" backend/src/app.ts",
-    "service" : "sudo systemctl start postgresql && sudo systemctl start redis"
+    "service": "sudo systemctl start postgresql && sudo systemctl start redis"
   },
   "prisma": {
     "seed": "tsx backend/src/prisma/seeds/seed.ts"
@@ -31,14 +31,17 @@
     "@prisma/client": "^7.3.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
+    "@types/multer": "^2.0.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.0.2",
     "pg": "^8.18.0",
     "pinata": "^2.5.1",
+    "puppeteer": "^24.37.5",
     "redis": "^5.10.0",
     "ts-node": "^10.9.2"
   }
