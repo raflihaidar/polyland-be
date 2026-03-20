@@ -122,7 +122,7 @@ export const loginWalletVerifyHandler = async (
       })
       .json({ status: "success", message: "Login degan wallet sukses" });
   } catch (error: unknown) {
-    next();
+    next(error);
   }
 };
 

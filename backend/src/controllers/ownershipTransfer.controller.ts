@@ -6,12 +6,49 @@ import { ApplicationStatus } from "../generated/prisma/enums";
 import fs from "fs";
 import path from "path";
 
+export const getApplication = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params
+
+    if (!id) throw new AppError('Permohonan tidak ditemukan', 404)
+
+    const result = await ownershipService.getApplication(id as string);
+
+    res.status(200).json({
+      message : 'application berhasil didapatkan',
+      data : result
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const searchApplication = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { fileNumber } = req.query
+    const person_id = req.person?.id
+
+    if (!fileNumber) throw new AppError('Berkas tidak ditemukan', 404)
+
+    const result = await ownershipService.searchApplication(fileNumber as string, person_id);
+
+    res.status(200).json({
+      status : !result ? 'not found' : 'success',
+      message : !result ? 'Berkas tidak ditemukan' : 'Berkas berhasil didapatkan',
+      data : result
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const submitApplication = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
+    const person_id = req.person?.id
     const files = req.files as {
       cert_file?: Express.Multer.File[];
       ktp_penjual?: Express.Multer.File[];
@@ -20,9 +57,8 @@ export const submitApplication = async (
       akta_jual_beli?: Express.Multer.File[];
       fc_sppt?: Express.Multer.File[];
       fc_pbb?: Express.Multer.File[];
+      ssb?: Express.Multer.File[];
     };
-
-    console.log("files : ", files.cert_file);
 
     if (!files) {
       throw new AppError("File wajib diupload", 400);
@@ -37,6 +73,7 @@ export const submitApplication = async (
       akta_jual_beli: "Akta Jual Beli",
       fc_sppt: "Fotokopi SPPT",
       fc_pbb: "Fotokopi PBB",
+      ssb: "SSB",
     };
 
     for (const [field, label] of Object.entries(requiredFiles)) {
@@ -63,7 +100,8 @@ export const submitApplication = async (
     }
 
     const {
-      person_id,
+      area_size,
+      land_office_id,
       street_address,
       rt,
       rw,
@@ -81,6 +119,8 @@ export const submitApplication = async (
       street_address,
       rt,
       rw,
+      area_size,
+      land_office_id,
       ward,
       subdistrict,
       regency,
@@ -94,11 +134,11 @@ export const submitApplication = async (
       akta_jual_beli: files.akta_jual_beli![0],
       fc_sppt: files.fc_sppt![0],
       fc_pbb: files.fc_pbb![0],
+      ssb: files.ssb![0],
     };
 
     const result = await ownershipService.submitApplication(
       payload,
-      _tempFolder,
     );
 
     res.status(201).json({
@@ -123,7 +163,6 @@ export const submitApplication = async (
         fs.rmSync(tempPath, { recursive: true, force: true });
       }
     }
-    console.log("error : ", error);
     next(error);
   }
 };
@@ -138,7 +177,7 @@ export const updateApplicationStatus = async (
     const { note, status } = req.body;
 
     const result = await ownershipService.updateApplicationStatus(
-      id,
+      id as string,
       status,
       note,
     );
@@ -146,7 +185,7 @@ export const updateApplicationStatus = async (
     const statusMessages: Record<ApplicationStatus, string> = {
       DIPROSES: "Permohonan sedang diproses",
       VERIFIKASI_BERKAS: "Permohonan dalam tahap verifikasi berkas",
-      PROSES_PENGUKURAN: "Permohonan dalam proses pengukuran",
+      MENUNGGU_PEMBAYARAN: "Silahkan melakukan pembayaran terlebih dahulu",
       PENANDATANGANAN: "Permohonan dalam tahap penandatanganan",
       DITOLAK: "Permohonan anda telah ditolak",
       SELESAI: "Permohonan telah selesai diproses",
@@ -171,7 +210,7 @@ export const updateApplication = async (
     const { id } = req.params;
 
     const result = await ownershipService.updateApplication(
-      id,
+      id as string,
       req.body,
       req.files as Record<string, Express.Multer.File[]>,
     );

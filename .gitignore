@@ -4,6 +4,9 @@
 # Compilation output
 /dist
 
+# file upload output
+/backend/src/uploads
+
 # pnpm deploy output
 /bundle
 

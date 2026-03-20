@@ -7,9 +7,9 @@ import authRouter from "./routes/auth.route";
 import verifAccountRouter from "./routes/verificationAccount.route";
 import ownershipTFRouter from "./routes/ownershipTransfer.route";
 import mitraRouter from "./routes/mitra.route";
+import landOfficeRouter from "./routes/landOffice.route";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler";
-import multer from "multer";
 const app = express();
 const port = process.env.APP_PORT || 8000;
 
@@ -26,16 +26,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/mitra", mitraRouter);
 app.use("/api/verification-account", verifAccountRouter);
 app.use("/api/ownership-transfer", ownershipTFRouter);
-// const upload = multer({ dest: "uploads/" });
-// app.post("/api/upload", upload.single("file"), (req, res) => {
-//   const file = req.file;
-//   if (!file) {
-//     return res.status(400).json({ error: "No file uploaded" });
-//   }
-//   res.json({ message: "File uploaded successfully", file });
-// });
-
-// Error handling
+app.use("/api/land-office", landOfficeRouter)
 app.use(errorHandler);
 
 const pinata = new PinataSDK({

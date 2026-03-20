@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-be2ba8b521276c39c2a6c6475601739b8c5c0534",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/MessageBoard.sol": "project/contracts/MessageBoard.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/MessageBoard.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\ncontract MessageBoard {\n    struct Message {\n        address author;\n        string content;\n        uint256 timestamp;\n    }\n\n    Message public lastMessage;\n    uint256 public messageCount;\n\n    event NewMessage(address indexed author, string content, uint256 timestamp);\n    event TipSent(address indexed tipper, address indexed recipient, uint256 amount);\n\n    function postMessage(string memory _content) public payable {\n        // If there's a previous message author, send them the tip\n        if (lastMessage.author != address(0) && msg.value > 0) {\n            payable(lastMessage.author).transfer(msg.value);\n            emit TipSent(msg.sender, lastMessage.author, msg.value);\n        }\n\n        lastMessage = Message(msg.sender, _content, block.timestamp);\n        messageCount++;\n\n        emit NewMessage(msg.sender, _content, block.timestamp);\n    }\n\n    function getLastMessage() public view returns (\n        address author,\n        string memory content,\n        uint256 timestamp\n    ) {\n        return (lastMessage.author, lastMessage.content, lastMessage.timestamp);\n    }\n}"
+      }
+    }
+  }
+}

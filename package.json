@@ -4,14 +4,15 @@
   "type": "module",
   "scripts": {
     "dev": "npx nodemon --exec \"tsx\" backend/src/app.ts",
-    "service": "sudo systemctl start postgresql && sudo systemctl start redis"
+    "service": "sudo systemctl start postgresql && sudo systemctl start redis-server"
   },
   "prisma": {
-    "seed": "tsx backend/src/prisma/seeds/seed.ts"
+    "seed": "npx tsx backend/src/prisma/seeds/seed.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.0.5",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.1",
+    "@nomicfoundation/hardhat-verify": "^3.0.11",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",

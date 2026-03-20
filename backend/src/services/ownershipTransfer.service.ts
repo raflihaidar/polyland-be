@@ -3,19 +3,138 @@ import { AppError } from "../utils/error";
 import { ApplicationCreate } from "../types/domain/ownershipTransfer.type";
 import { DocumentType, ApplicationStatus } from "../generated/prisma/enums";
 import fs from "fs";
-import path from "path";
 
-const baseUploadDir = path.join(process.cwd(), "backend", "src", "uploads");
+export const getApplication = async (id: string) => {
+  try {
+    const application = await prisma.application.findUnique({
+      where: {
+        id: id,
+      },
+      include: {
+        applicationDocuments: true,
+        land: {
+          select: {
+            street_address: true,
+            rt: true,
+            rw: true,
+            ward: true,
+            subdistrict: true,
+            regency: true,
+            province: true,
+          },
+        },
+        landOffice: {
+          select: {
+            name: true
+          }
+        },
+        person: {
+          select: {
+            name: true,
+            nik: true,
+            phone: true,
+            address: true
+          }
+        },
+      },
+    });
+
+    if (!application) return null;
+
+    return {
+      ...application,
+      total_fee: Number(application.total_fee),
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const searchApplication = async (
+  search: string | undefined,
+  currentUserId: string
+) => {
+  try {
+    const application = await prisma.application.findFirst({
+      where: search
+        ? {
+          file_number: search
+        }
+        : {},
+      include: {
+        officer: {
+          select: {
+            name: true
+          }
+        },
+        person: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        land: {
+          select: {
+            area_size: true
+          }
+        },
+        landOffice: {
+          select: {
+            name: true,
+            code : true,
+            address: true,
+            email: true,
+            phone: true
+          }
+        }
+      },
+    });
+
+    if (!application) return null;
+
+    const isOwner = application.person_id === currentUserId;
+
+    return {
+      ...application,
+      total_fee: Number(application.total_fee),
+      canPay:
+        isOwner && application.status === ApplicationStatus.MENUNGGU_PEMBAYARAN,
+    };
+  } catch (error) {
+    throw new AppError("Gagal mengambil data application", 500);
+  }
+};
 
 export const submitApplication = async (
   data: ApplicationCreate,
-  tempFolder: string,
 ) => {
   try {
     return await prisma.$transaction(async (tx) => {
-      // 1️⃣ Create land
+
+      const year = new Date().getFullYear()
+
+      let counter = await tx.fileCounter.findUnique({
+        where: { id: 1 }
+      })
+
+      if (!counter) {
+        counter = await tx.fileCounter.create({
+          data: { id: 1, value: 0 }
+        })
+      }
+
+      const updatedCounter = await tx.fileCounter.update({
+        where: { id: 1 },
+        data: { value: { increment: 1 } }
+      })
+
+      const formattedNumber = String(updatedCounter.value).padStart(3, "0")
+
+      const file_number = `${data.cert_type}-${year}-${formattedNumber}`
+
       const land = await tx.land.create({
         data: {
+          area_size: data.area_size,
           street_address: data.street_address ?? "",
           rt: data.rt ?? "",
           rw: data.rw ?? "",
@@ -26,67 +145,40 @@ export const submitApplication = async (
         },
       });
 
-      // 2️⃣ Create application
+      const price = await tx.landOfficePrice.findFirst({
+        where: {
+          land_office_id: data.land_office_id
+        }
+      });
+
+      if (!price) {
+        throw new AppError("Harga tanah kantor belum diatur", 400);
+      }
+
+      const landArea = Number(data.area_size);
+
+      const landValue = price.price_per_m2 * landArea;
+
+      const total_fee =
+        landValue / 1000 + price.registration_fee;
+
       const application = await tx.application.create({
         data: {
           person_id: data.person_id,
           land_id: land.id,
+          land_office_id: data.land_office_id,
           type: data.cert_type,
+          file_number: file_number,
+          land_price_per_m2: price.price_per_m2,
+          registration_fee: price.registration_fee,
+          total_fee: Math.round(total_fee)
         },
       });
 
-      // 3️⃣ Rename temp folder
-      const tempPath = path.join(baseUploadDir, "temp", tempFolder);
-      const finalPath = path.join(baseUploadDir, application.id);
-
-      if (fs.existsSync(tempPath)) {
-        fs.renameSync(tempPath, finalPath);
-      }
-
-      // 4️⃣ Map file → DocumentType
-      const documents = [
-        {
-          file: data.cert_file,
-          type: DocumentType.SERTIFIKAT_TANAH,
-        },
-        {
-          file: data.ktp_penjual,
-          type: DocumentType.KTP_PENJUAL,
-        },
-        {
-          file: data.kk_pembeli,
-          type: DocumentType.KK_PEMBELI,
-        },
-        {
-          file: data.ktp_pembeli,
-          type: DocumentType.KTP_PEMBELI,
-        },
-        {
-          file: data.akta_jual_beli,
-          type: DocumentType.AKTA_JUAL_BELI,
-        },
-        {
-          file: data.fc_sppt,
-          type: DocumentType.SPPT,
-        },
-        {
-          file: data.fc_pbb,
-          type: DocumentType.PBB,
-        },
-      ];
-
-      await tx.applicationDocument.createMany({
-        data: documents.map((doc) => ({
-          application_id: application.id,
-          type: doc.type,
-          fileUrl: `uploads/${application.id}/${doc.file.filename}`,
-          fileName: doc.file.filename,
-          mimeType: doc.file.mimetype,
-          fileSize: doc.file.size,
-        })),
-      });
-
-      return application;
+      return {
+        ...application,
+        total_fee: Number(application.total_fee)
+      };
     });
   } catch (error) {
     throw new AppError("Gagal submit application", 500);
@@ -101,6 +193,7 @@ const documentTypeMap: Record<string, string> = {
   akta_jual_beli: "AKTA_JUAL_BELI",
   fc_sppt: "FC_SPPT",
   fc_pbb: "FC_PBB",
+  ssb: "SSB",
 };
 
 export const updateApplicationStatus = async (
@@ -129,7 +222,10 @@ export const updateApplicationStatus = async (
       },
     });
 
-    return updated;
+    return {
+      ...updated,
+      total_fee: Number(updated.total_fee)
+    };
   } catch (error) {
     throw new AppError("Gagal memproses permohonan", 500);
   }
@@ -165,6 +261,7 @@ export const updateApplication = async (
     await tx.land.update({
       where: { id: application.land_id },
       data: {
+        area_size: data.area_size,
         street_address: data.street_address,
         rt: data.rt,
         rw: data.rw,
@@ -181,7 +278,6 @@ export const updateApplication = async (
     if (files && Object.keys(files).length > 0) {
       for (const field in files) {
         const newFile = files[field][0];
-        console.log("path : ", newFile.path);
         const mappedType = documentTypeMap[field];
 
         if (!mappedType) continue;

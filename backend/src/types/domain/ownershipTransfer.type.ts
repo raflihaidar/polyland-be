@@ -1,10 +1,16 @@
 import { CertificateType } from "../../generated/prisma/client";
 
+export interface Application {
+  
+}
+
 export interface ApplicationCreate {
   person_id: string;
   land_id?: string;
+  land_office_id : string
 
   // Land
+  area_size : string
   street_address?: string;
   rt?: string;
   rw?: string;
@@ -25,4 +31,5 @@ export interface ApplicationCreate {
   akta_jual_beli: Express.Multer.File;
   fc_sppt: Express.Multer.File;
   fc_pbb: Express.Multer.File;
+  ssb: Express.Multer.File;
 }

@@ -161,6 +161,7 @@ export const getUser = async (id: string) => {
         name: true,
         username: true,
         email: true,
+        isVerified : true,
         roles: {
           include: {
             role: { select: { name: true } },
@@ -228,6 +229,7 @@ export const loginWalletVerify = async (
   signature: `0x${string}`,
 ) => {
   try {
+    console.log("wallet address : ", wallet_address)
     const person = await prisma.person.findUnique({
       where: { wallet_address },
       include: {
@@ -235,7 +237,10 @@ export const loginWalletVerify = async (
       },
     });
 
-    if (!person || !person.nonce) {
+    console.log("person : ", person)
+
+    
+    if (!person) {
       throw new AppError("Data tidak ditemukan", 404);
     }
 
@@ -328,7 +333,7 @@ export const loginWalletVerify = async (
 
     const { accessToken, refreshToken } = generateTokens(jwtPayload);
 
-    await redis.set(`refresh:${person.id}`, refreshToken, {
+    await redisClient.set(`refresh:${person.id}`, refreshToken, {
       EX: 60 * 60 * 24 * 7,
     });
 

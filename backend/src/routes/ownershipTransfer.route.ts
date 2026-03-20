@@ -1,5 +1,7 @@
 import express from "express";
 import {
+  getApplication,
+  searchApplication,
   submitApplication,
   updateApplicationStatus,
   updateApplication,
@@ -11,6 +13,8 @@ const router = express.Router();
 
 router.use(authentication);
 
+router.get('/', searchApplication)
+router.get('/detail/:id', getApplication)
 router.post(
   "/submit",
   upload.fields([
@@ -21,6 +25,7 @@ router.post(
     { name: "akta_jual_beli", maxCount: 1 },
     { name: "fc_sppt", maxCount: 1 },
     { name: "fc_pbb", maxCount: 1 },
+    { name: "ssb", maxCount: 1 },
   ]),
   submitApplication,
 );
@@ -28,7 +33,7 @@ router.put("/status/:id", updateApplicationStatus);
 router.put(
   "/:id",
   (req, res, next) => {
-    const upload = uploadUpdate(req.params.id).fields([
+    const upload = uploadUpdate(req.params.id as string).fields([
       { name: "cert_file", maxCount: 1 },
       { name: "ktp_penjual", maxCount: 1 },
       { name: "kk_pembeli", maxCount: 1 },
@@ -36,6 +41,7 @@ router.put(
       { name: "akta_jual_beli", maxCount: 1 },
       { name: "fc_sppt", maxCount: 1 },
       { name: "fc_pbb", maxCount: 1 },
+      { name: "ssb", maxCount: 1 },
     ]);
 
     upload(req, res, function (err) {

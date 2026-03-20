@@ -2,10 +2,13 @@ import { prisma } from "../../config/prisma";
 import { seedRoles } from "./role.seed";
 import { seedModules } from "./module.seed";
 import { seedRolePrivileges } from "./role-privilege.seed";
+import { landOfficeModules } from "./landOffice.seed";
 
 const main = async () => {
   const args = process.argv.slice(2);
   const target = args[0];
+
+  console.log("target : ", target)
 
   switch (target) {
     case "role":
@@ -17,9 +20,12 @@ const main = async () => {
     case "role-privilege":
       await seedRolePrivileges(prisma);
       break;
+    case "land-office":
+      await landOfficeModules(prisma);
+      break;
     default:
       console.log(
-        "Please specify a valid seed target (roles, module, permissions)",
+        "Please specify a valid seed target (role, module, permissions)",
       );
   }
 };
