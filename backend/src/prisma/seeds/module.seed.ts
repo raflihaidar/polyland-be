@@ -2,9 +2,9 @@ import { PrismaClient } from "@prisma/client/extension";
 
 export const seedModules = async (prisma: PrismaClient) => {
   // Hapus data lama
-  // await prisma.$executeRawUnsafe(
-  //   `TRUNCATE TABLE "Privilege" RESTART IDENTITY CASCADE;`,
-  // );
+  await prisma.$executeRawUnsafe(
+    `TRUNCATE TABLE "privileges" RESTART IDENTITY CASCADE;`,
+  );
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE "modules" RESTART IDENTITY CASCADE;`,
   );
@@ -25,6 +25,9 @@ export const seedModules = async (prisma: PrismaClient) => {
     { name: "Sertipikatku", slug: "sertipikatku", section: "Layanan" },
     { name: "Aktaku", slug: "aktaku", section: "Layanan" },
     { name: "Berkasku", slug: "berkasku", section: "Layanan" },
+    {name : "Kantah", slug : "kantah", section : "Management"},
+
+    {name : "Verifikasi Akun", slug : "verifikasi-akun", section : "Authentikasi"},
 
     // Setting
     { name: "User", slug: "user", section: "SETTING" },

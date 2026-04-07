@@ -1,8 +1,104 @@
 import { prisma } from "../config/prisma";
+import { Prisma } from "../generated/prisma/client";
 import { AppError } from "../utils/error";
 import { ApplicationCreate } from "../types/domain/ownershipTransfer.type";
 import { DocumentType, ApplicationStatus } from "../generated/prisma/enums";
 import fs from "fs";
+import { serializeBigInt } from "../utils/parse";
+
+export const getListApplication = async (
+  land_office_id: string,
+  page = 1,
+  limit = 10,
+  search?: string
+) => {
+  try {
+    if (!land_office_id) {
+      throw new AppError("Kantor pertanahan tidak ditemukan", 500);
+    }
+
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ApplicationWhereInput = {
+      land_office_id,
+      ...(search && {
+        OR: [
+          {
+            file_number: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+          {
+            land: {
+              street_address: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          },
+          {
+            person: {
+              name: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          },
+        ],
+      }),
+    };
+
+
+    console.log("where : ", where)
+
+    const [data, total] = await Promise.all([
+      prisma.application.findMany({
+        where,
+        include: {
+          applicationDocuments: true,
+          land: {
+            select: {
+              street_address: true,
+              rt: true,
+              rw: true,
+              ward: true,
+              subdistrict: true,
+              regency: true,
+              province: true,
+            },
+          },
+          person: {
+            select: {
+              name: true,
+              nik: true,
+              phone: true,
+              address: true,
+            },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+      prisma.application.count({ where }),
+    ]);
+
+    return serializeBigInt({
+      applications : data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    throw new AppError("Gagal mengambil data list permohonan", 500);
+  }
+};
 
 export const getApplication = async (id: string) => {
   try {
@@ -81,7 +177,7 @@ export const searchApplication = async (
         landOffice: {
           select: {
             name: true,
-            code : true,
+            code: true,
             address: true,
             email: true,
             phone: true
@@ -197,13 +293,13 @@ const documentTypeMap: Record<string, string> = {
 };
 
 export const updateApplicationStatus = async (
-  applicationId: string,
+  fileNumber: string,
   status: ApplicationStatus,
   note?: string,
 ) => {
   try {
     const application = await prisma.application.findUnique({
-      where: { id: applicationId },
+      where: { file_number: fileNumber },
     });
 
     if (!application) {
@@ -215,7 +311,7 @@ export const updateApplicationStatus = async (
     }
 
     const updated = await prisma.application.update({
-      where: { id: applicationId },
+      where: { file_number : fileNumber },
       data: {
         status,
         notes: note ?? null,
@@ -227,6 +323,7 @@ export const updateApplicationStatus = async (
       total_fee: Number(updated.total_fee)
     };
   } catch (error) {
+    console.log("error : ", error)
     throw new AppError("Gagal memproses permohonan", 500);
   }
 };
@@ -335,3 +432,7 @@ export const updateApplication = async (
 
   return result;
 };
+
+export const paymentVerification = async () => {
+
+}

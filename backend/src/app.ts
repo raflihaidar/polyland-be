@@ -3,13 +3,19 @@ import "dotenv/config";
 import { PinataSDK } from "pinata";
 import { File } from "buffer";
 import cors from "cors";
+import { parseAbiItem, bytesToString, hexToString } from "viem";
+import { wsPublicClient } from "./config/wallet";
+import { updateApplicationStatus } from "./services/ownershipTransfer.service";
+import { ApplicationStatus } from "../src/generated/prisma/enums";
 import authRouter from "./routes/auth.route";
 import verifAccountRouter from "./routes/verificationAccount.route";
 import ownershipTFRouter from "./routes/ownershipTransfer.route";
 import mitraRouter from "./routes/mitra.route";
 import landOfficeRouter from "./routes/landOffice.route";
+import documentRouter from "./routes/document.route"
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler";
+
 const app = express();
 const port = process.env.APP_PORT || 8000;
 
@@ -27,6 +33,7 @@ app.use("/api/mitra", mitraRouter);
 app.use("/api/verification-account", verifAccountRouter);
 app.use("/api/ownership-transfer", ownershipTFRouter);
 app.use("/api/land-office", landOfficeRouter)
+app.use("/api/document", documentRouter)
 app.use(errorHandler);
 
 const pinata = new PinataSDK({
@@ -37,6 +44,28 @@ const pinata = new PinataSDK({
 function getRandomInt(max: number) {
   return Math.floor(Math.random() * max);
 }
+
+wsPublicClient.watchEvent({
+  address: process.env.PAYMENT_CONTRACT_ADDRESS_V4 as `0x${string}`,
+  event: parseAbiItem(
+    "event PaymentReceived(bytes32 indexed applicationId, bytes32 kantahCode, address indexed payer, uint256 amount)"
+  ),
+  onLogs: async (logs) => {
+    console.log(logs)
+
+    for (const log of logs) {
+
+      const txHash = log.transactionHash
+      const { applicationId, payer } = log.args
+
+      const decodedApplicationId = hexToString(applicationId!, {
+        size: 32,
+      }).replace(/\0/g, "")
+
+      await updateApplicationStatus(decodedApplicationId, ApplicationStatus.PENANDATANGANAN)
+    }
+  }
+})
 
 app.get("/files", async (req, res) => {
   try {

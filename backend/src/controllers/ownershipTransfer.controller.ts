@@ -6,6 +6,28 @@ import { ApplicationStatus } from "../generated/prisma/enums";
 import fs from "fs";
 import path from "path";
 
+
+export const getListApplication = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { land_office_id } = req.params
+    const {page, limit, search} = req.query
+
+    console.log("query : ", req.query)
+
+    if (!land_office_id) throw new AppError('Id kantor pertanahan kosong', 403)
+
+    const result = await ownershipService.getListApplication(land_office_id as string, Number(page), Number(limit), search as string);
+
+    res.status(200).json({
+      message : 'application berhasil didapatkan',
+      data : result
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+
 export const getApplication = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params
@@ -173,11 +195,11 @@ export const updateApplicationStatus = async (
   next: NextFunction,
 ) => {
   try {
-    const { id } = req.params;
+    const { fileNumber } = req.params;
     const { note, status } = req.body;
 
     const result = await ownershipService.updateApplicationStatus(
-      id as string,
+      fileNumber as string,
       status,
       note,
     );

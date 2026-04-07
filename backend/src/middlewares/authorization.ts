@@ -45,9 +45,9 @@ export const authorize = (module: string, action: string) => {
                     select: {
                       privilege: {
                         select: {
-                          name: true,
+                          action : true,
                           module: {
-                            select: { name: true },
+                            select: { slug: true },
                           },
                         },
                       },
@@ -69,17 +69,18 @@ export const authorize = (module: string, action: string) => {
        */
       const permissions = user.roles.flatMap((rp) =>
         rp.role.privileges.map(
-          (p) => `${p.privilege.module.name}:${p.privilege.name}`,
+          (p) => `${p.privilege.module.slug}:${p.privilege.action}`,
         ),
       );
 
       const uniquePermissions = [...new Set(permissions)];
 
+      await redisClient.del(permissionKey);
+      
       /**
        * 4️⃣ RE-CACHE KE REDIS
        */
       if (uniquePermissions.length > 0) {
-        await redisClient.del(permissionKey);
         await redisClient.sAdd(permissionKey, uniquePermissions);
         await redisClient.expire(permissionKey, 60 * 60 * 24);
       }

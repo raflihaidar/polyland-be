@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  getListApplication,
   getApplication,
   searchApplication,
   submitApplication,
@@ -7,16 +8,19 @@ import {
   updateApplication,
 } from "../controllers/ownershipTransfer.controller";
 import { authentication } from "../middlewares/authentication";
+import { authorize } from "../middlewares/authorization";
 import { upload, uploadUpdate } from "../middlewares/fileUpload";
 
 const router = express.Router();
 
 router.use(authentication);
 
-router.get('/', searchApplication)
-router.get('/detail/:id', getApplication)
+router.get('/', authorize("peralihan-hak", "read"), searchApplication)
+router.get('/:land_office_id', authorize("peralihan-hak", "read"), getListApplication)
+router.get('/detail/:id', authorize("peralihan-hak", "read"), getApplication)
 router.post(
   "/submit",
+  authorize("peralihan-hak", "create"),
   upload.fields([
     { name: "cert_file", maxCount: 1 },
     { name: "ktp_penjual", maxCount: 1 },
@@ -29,9 +33,10 @@ router.post(
   ]),
   submitApplication,
 );
-router.put("/status/:id", updateApplicationStatus);
+router.put("/status/:fileNumber", authorize("peralihan-hak", "update"), updateApplicationStatus);
 router.put(
   "/:id",
+  authorize("peralihan-hak", "update"),
   (req, res, next) => {
     const upload = uploadUpdate(req.params.id as string).fields([
       { name: "cert_file", maxCount: 1 },

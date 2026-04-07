@@ -1,9 +1,10 @@
-import { createPublicClient, createWalletClient, http } from "viem";
+import { createPublicClient, createWalletClient, http, webSocket } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { polygonAmoy } from "viem/chains";
 import CertificateABI from "../../../abi/certificateNFT.json";
 
 const RPC_URL = process.env.RPC_URL;
+const WS_RPC_URL = process.env.RPC_WS_URL;
 const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
 const ADMIN_PRIVATE_KEY = process.env.PRIVATE_KEY;
 
@@ -36,3 +37,8 @@ export const contractConfig = {
   address: CONTRACT_ADDRESS as `0x${string}`,
   abi: CertificateABI,
 };
+
+export const wsPublicClient = createPublicClient({
+  chain: polygonAmoy,
+  transport: webSocket(WS_RPC_URL!)
+})

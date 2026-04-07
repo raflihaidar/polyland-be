@@ -65,9 +65,9 @@ export const login = async (email: string) => {
                   select: {
                     privilege: {
                       select: {
-                        name: true,
+                        action : true,
                         module: {
-                          select: { name: true },
+                          select: { slug : true },
                         },
                       },
                     },
@@ -100,10 +100,11 @@ export const login = async (email: string) => {
      */
     const permissions = person.roles.flatMap((rp) =>
       rp.role.privileges.map(
-        (p) => `${p.privilege.module.name}:${p.privilege.name}`,
+        (p) => `${p.privilege.module.slug}:${p.privilege.action}`,
       ),
     );
 
+    
     // hapus duplicate permission
     const uniquePermissions = [...new Set(permissions)];
 
@@ -133,9 +134,15 @@ export const login = async (email: string) => {
     // 2️⃣ simpan permission sebagai Redis Set
     const permissionKey = `permission:${person.id}`;
 
+    await redisClient.del(permissionKey);
+
+    console.log("ada permission : ", uniquePermissions.length > 0)
+
+    // simpan permission sebagai Redis Set
     if (uniquePermissions.length > 0) {
-      await redisClient.del(permissionKey);
       await redisClient.sAdd(permissionKey, uniquePermissions);
+
+      // expire optional (recommended)
       await redisClient.expire(permissionKey, 60 * 60 * 24); // 1 hari
     }
 

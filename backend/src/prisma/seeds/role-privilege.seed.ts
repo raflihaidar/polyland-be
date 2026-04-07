@@ -2,10 +2,10 @@ import { PrismaClient } from "@prisma/client/extension";
 
 export const seedRolePrivileges = async (prisma: PrismaClient) => {
   // hapus data lama
-  // await prisma.rolePrivilege.deleteMany();
-  // await prisma.$executeRawUnsafe(
-  //   `ALTER SEQUENCE "RolePrivilege_id_seq" RESTART WITH 1;`,
-  // );
+  await prisma.rolePrivilege.deleteMany();
+  await prisma.$executeRawUnsafe(
+    `ALTER SEQUENCE "role_privileges_id_seq" RESTART WITH 1;`,
+  );
 
   // Ambil semua privilege
   const allPrivileges = await prisma.privilege.findMany();
