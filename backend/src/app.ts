@@ -3,9 +3,11 @@ import "dotenv/config";
 import { PinataSDK } from "pinata";
 import { File } from "buffer";
 import cors from "cors";
+import http from "http"
 import { parseAbiItem, bytesToString, hexToString } from "viem";
 import { wsPublicClient } from "./config/wallet";
 import { updateApplicationStatus } from "./services/ownershipTransfer.service";
+import { generateCertificate } from "./services/document.service";
 import { ApplicationStatus } from "../src/generated/prisma/enums";
 import authRouter from "./routes/auth.route";
 import verifAccountRouter from "./routes/verificationAccount.route";
@@ -15,9 +17,12 @@ import landOfficeRouter from "./routes/landOffice.route";
 import documentRouter from "./routes/document.route"
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler";
+// import { initSocket } from "./config/socket"
+
 
 const app = express();
 const port = process.env.APP_PORT || 8000;
+// const server = http.createServer(app)
 
 app.use(express.json());
 app.use(cookieParser());
@@ -51,8 +56,6 @@ wsPublicClient.watchEvent({
     "event PaymentReceived(bytes32 indexed applicationId, bytes32 kantahCode, address indexed payer, uint256 amount)"
   ),
   onLogs: async (logs) => {
-    console.log(logs)
-
     for (const log of logs) {
 
       const txHash = log.transactionHash
@@ -62,7 +65,11 @@ wsPublicClient.watchEvent({
         size: 32,
       }).replace(/\0/g, "")
 
-      await updateApplicationStatus(decodedApplicationId, ApplicationStatus.PENANDATANGANAN)
+      const data = await updateApplicationStatus(decodedApplicationId, ApplicationStatus.PENANDATANGANAN)
+
+      if(data.status === ApplicationStatus.PENANDATANGANAN) {
+        await generateCertificate(data?.file_number, txHash)
+      }
     }
   }
 })

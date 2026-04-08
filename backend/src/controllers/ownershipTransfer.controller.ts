@@ -133,6 +133,8 @@ export const submitApplication = async (
       province,
       cert_number,
       cert_type,
+      province_code,
+      regency_code,
       _tempFolder,
     } = req.body;
 
@@ -147,6 +149,8 @@ export const submitApplication = async (
       subdistrict,
       regency,
       province,
+      province_code : Number(province_code),
+      regency_code : Number(regency_code),
       cert_number,
       cert_type,
       cert_file: files.cert_file![0],

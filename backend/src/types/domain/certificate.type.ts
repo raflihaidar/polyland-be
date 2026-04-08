@@ -5,6 +5,7 @@ export interface CertificateCreate {
     code : string;
     land_id : string;
     owner_id : string;
+    application_id : string;
     cid? : string;
     status : CertificateStatus;
     type : CertificateType;

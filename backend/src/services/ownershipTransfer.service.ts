@@ -49,9 +49,6 @@ export const getListApplication = async (
       }),
     };
 
-
-    console.log("where : ", where)
-
     const [data, total] = await Promise.all([
       prisma.application.findMany({
         where,
@@ -228,6 +225,8 @@ export const submitApplication = async (
 
       const file_number = `${data.cert_type}-${year}-${formattedNumber}`
 
+      console.log("data : ", data)
+
       const land = await tx.land.create({
         data: {
           area_size: data.area_size,
@@ -238,6 +237,8 @@ export const submitApplication = async (
           subdistrict: data.subdistrict ?? "",
           regency: data.regency ?? "",
           province: data.province ?? "",
+          province_code : data.province_code,
+          regency_code : data.regency_code
         },
       });
 
@@ -277,6 +278,7 @@ export const submitApplication = async (
       };
     });
   } catch (error) {
+    console.log("error : ", error)
     throw new AppError("Gagal submit application", 500);
   }
 };

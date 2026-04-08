@@ -35,3 +35,13 @@ Makna kode indeks letak bidang tanah :
 4: Bidang di atas bidang permukaan tanah.
 5: Ruang pada ruang atas tanah.
 6: Ruang pada ruang bawah tanah.
+
+
+  const nib = await generateNIB(application?.land?.province_code, application?.land?.regency_code, 1);
+
+  const nibFormated = 
+
+
+3535090900000011
+
+agar menjadi 35.09.000000001.1

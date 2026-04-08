@@ -1,12 +1,11 @@
 import { prisma } from "../config/prisma";
-import fs from "fs";
-import path from "path";
 import { CertificateCreate } from "../types/domain/certificate.type";
+import { AppError } from "../utils/error";
 
-export const publishCertificate = async (payload : CertificateCreate) => {
+export const publishCertificate = async (payload: CertificateCreate) => {
     const certificate = await prisma.certificate.create({
-        data : payload
-    })
+        data: payload,
+    });
 
-    return certificate
+    return certificate;
 }

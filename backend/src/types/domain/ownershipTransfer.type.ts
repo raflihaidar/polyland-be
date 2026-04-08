@@ -18,6 +18,8 @@ export interface ApplicationCreate {
   subdistrict?: string;
   regency?: string;
   province?: string;
+  province_code : number;
+  regency_code : number;
 
   // Certificate
   cert_number: string;

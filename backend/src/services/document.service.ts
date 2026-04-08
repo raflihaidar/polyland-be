@@ -9,6 +9,7 @@ import { publishCertificate } from "./certificate.service";
 import { CertificateStatus } from "../generated/prisma/enums";
 import QRCode from "qrcode";
 import CryptoJS from "crypto-js";
+import { AppError } from "../utils/error";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,7 +21,7 @@ export const generateUniqueCode = (length = 6): string => {
   const randomSeed =
     Date.now().toString() + Math.random().toString();
 
-   const hash = CryptoJS.SHA256(randomSeed).toString();
+  const hash = CryptoJS.SHA256(randomSeed).toString();
 
   let result = "";
 
@@ -61,28 +62,39 @@ export const generateNIB = async (
       regency_code: regencyCode,
     },
     orderBy: {
-      created_at: "desc",
+      createdAt: "desc",
     },
-    select: {
-      nib: true,
+    include: {
+      certificates: {
+        select: {
+          nib: true
+        }
+      }
     },
   });
 
   let nextSequence = 1;
 
-  if (lastLand?.nib) {
-    const lastSequence = lastLand.nib.slice(4, 13); // ambil 9 digit tengah
-    nextSequence = parseInt(lastSequence) + 1;
-  }
+  lastLand?.certificates.forEach((item) => {
+    if (item.nib) {
+      const lastSequence = item.nib.slice(4, 13); // ambil 9 digit tengah
+      nextSequence = parseInt(lastSequence) + 1;
+    }
+  })
 
   const sequenceFormatted = nextSequence
     .toString()
     .padStart(9, "0");
 
+  let formatedRegencyCode = regencyCode % 100
+
   const nib =
     provinceCode.toString().padStart(2, "0") +
-    regencyCode.toString().padStart(2, "0") +
+    "." +
+    formatedRegencyCode.toString().padStart(2, "0") +
+    "." +
     sequenceFormatted +
+    "." +
     indeksLetak.toString();
 
   return nib;
@@ -90,7 +102,8 @@ export const generateNIB = async (
 
 export const buildCertificateAssets = async (
   application: any,
-  txHash: string
+  txHash: string,
+  existingNIB : boolean
 ) => {
 
   const templatePath = path.join(
@@ -123,11 +136,14 @@ export const buildCertificateAssets = async (
   const garudaImage = imageToBase64(garudaPath);
 
   const code = generateUniqueCode(6);
-
-  const nib = generateNIB(application);
+  let nib;
+  if(!existingNIB){
+    nib = await generateNIB(application?.land?.province_code, application?.land?.regency_code, 1);
+  }else{
+    nib = existingNIB
+  }
 
   const qr_doc = await generateQRDoc(txHash);
-
 
   return {
     htmlTemplate,
@@ -168,12 +184,14 @@ export const generatePDF = async (html: string) => {
 
 export const generateCertificate = async (fileNumber: string, txHash: string) => {
 
+
   const application = await prisma.application.findUnique({
     where: { file_number: fileNumber },
     include: {
       land: true,
       person: true,
       landOffice: true,
+      certificate : true
     },
   });
 
@@ -181,10 +199,11 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
     throw new Error("Application tidak ditemukan");
   }
 
-  const {htmlTemplate, garudaImage, code, nib, qr_doc} = await buildCertificateAssets(application, txHash)
+  if(application.certificate){
+    throw new AppError("Sertifikat sudah pernah diterbitkan untuk permohonan ini", 400);
+  }
 
-
-  console.log("build assets : ", await buildCertificateAssets(application, txHash))
+  const { htmlTemplate, garudaImage, code, nib, qr_doc } = await buildCertificateAssets(application, txHash)
 
   const template = handlebars.compile(htmlTemplate);
 
@@ -200,38 +219,59 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
 
   const qr_ttd = "";
 
-  await publishCertificate({
-    nib,
-    code,
-    hash: txHash,
-    land_id: application.land_id,
-    owner_id: application.person_id,
-    status: CertificateStatus.AKTIF,
-    type: application.type
-  })
+  try {
+    await publishCertificate({
+      nib,
+      code,
+      hash: txHash,
+      land_id: application.land_id,
+      owner_id: application.person_id,
+      status: CertificateStatus.AKTIF,
+      type: application.type,
+      application_id : application.id
+    })
 
-  const html = template({
-    garuda_path: garudaImage,
-    code,
-    type: selectedCertificateType?.label ?? "-",
-    area_size: application.land.area_size,
-    owner: application.person.name,
-    birth_date: application.person.birthDate,
-    street_address: application.land.street_address,
-    ward: application.land.ward,
-    subdistrict: application.land.subdistrict,
-    regency: application.land.regency,
-    province: application.land.province,
-    nama_kepala_kantor:
-      application.landOffice.head_office,
-    nip: application.landOffice.nip,
-    nama_kabupaten:
-      application.land.regency,
-    nib,
-    catatan_list: application.notes ?? "-",
-    qr_ttd,
-    qr_doc,
-  });
-  const pdfBuffer = await generatePDF(html);
-  return pdfBuffer;
+    const html = template({
+      garuda_path: garudaImage,
+      code,
+      type: selectedCertificateType?.label ?? "-",
+      area_size: application.land.area_size,
+      owner: application.person.name,
+      birth_date: application.person.birthDate,
+      street_address: application.land.street_address,
+      ward: application.land.ward,
+      subdistrict: application.land.subdistrict,
+      regency: application.land.regency,
+      province: application.land.province,
+      nama_kepala_kantor:
+        application.landOffice.head_office,
+      nip: application.landOffice.nip,
+      nama_kabupaten:
+        application.land.regency,
+      nib,
+      catatan_list: application.notes ?? "-",
+      qr_ttd,
+      qr_doc,
+    });
+
+    const pdfBuffer = await generatePDF(html);
+
+    const uploadDir = path.join(__dirname, "..", "uploads", "certificate");
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filePath = path.join(
+      uploadDir,
+      `${application.file_number}.pdf`
+    );
+
+    fs.writeFileSync(filePath, pdfBuffer);
+
+    return pdfBuffer;
+  } catch (error) {
+    console.log(error)
+    throw new AppError(`Terjadi kesalahan pada saat generate certificate dengan code ${code}`, 400);
+  }
 };
