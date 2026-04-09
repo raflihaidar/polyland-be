@@ -78,19 +78,23 @@ model Person {
   username String? @unique @db.VarChar(100)
   password String? @db.VarChar(100)
 
+  nip String? @db.VarChar(20)
+  digitalSignature String? @db.Text
+
   nonce     String?  @db.VarChar(100)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   accountVerifications AccountVerification[]
   verifiedAccounts     AccountVerification[] @relation("VerificationApprover")
-  certificates         Certificate[]
   DeedOwner            Deed[]                @relation("DeedOwner")
   DeedCreator          Deed[]                @relation("DeedCreator")
   officerApplications  Application[]         @relation("ApplicationOfficer")
   applications         Application[]
   roles                RolePerson[]
   landOffice           LandOffice?           @relation(fields: [land_office_id], references: [id])
+  certificateOwners    CertificateOwner[]
+  headOfLandOffice LandOffice? @relation("HeadOffice")
 
   @@map("persons")
 }
@@ -139,11 +143,12 @@ model LandOffice {
   phone String? @db.VarChar(20)
   email String? @db.VarChar(150)
 
-  head_office String? @db.VarChar(255)
-  nip         String? @db.VarChar(20)
+  head_office_id String? @db.Uuid @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  headOffice Person? @relation("HeadOffice", fields: [head_office_id], references: [id])
 
   employees        Person[]
   applications     Application[]
@@ -196,20 +201,33 @@ model Certificate {
   nib            String             @unique @db.VarChar(100)
   code           String             @unique @db.VarChar(100)
   land_id        String             @db.Uuid
-  owner_id       String             @db.Uuid
   cid            String?            @db.VarChar(255)
   status         CertificateStatus?
   type           CertificateType
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @default(now())
   hash           String?            @db.VarChar(255)
-  application_id String             @db.Uuid  @unique
+  application_id String             @unique @db.Uuid
 
-  land        Land        @relation(fields: [land_id], references: [id])
-  owner       Person      @relation(fields: [owner_id], references: [id])
-  application Application @relation(fields: [application_id], references: [id])
+  land        Land               @relation(fields: [land_id], references: [id])
+  application Application        @relation(fields: [application_id], references: [id])
+  owners      CertificateOwner[]
 
   @@map("certificates")
+}
+
+model CertificateOwner {
+  id             String   @id @default(uuid()) @db.Uuid
+  certificate_id String   @db.Uuid
+  person_id      String   @db.Uuid
+  ownership_pct  Float?   @default(100)
+  createdAt      DateTime @default(now())
+
+  certificate Certificate @relation(fields: [certificate_id], references: [id])
+  person      Person      @relation(fields: [person_id], references: [id])
+
+  @@unique([certificate_id, person_id])
+  @@map("certificate_owners")
 }
 
 model Deed {
@@ -257,7 +275,7 @@ model Application {
   officer              Person?               @relation("ApplicationOfficer", fields: [officer_id], references: [id])
   applicationDocuments ApplicationDocument[]
   personId             String?               @db.Uuid
-  certificate         Certificate?
+  certificate          Certificate?
 
   @@map("applications")
 }
