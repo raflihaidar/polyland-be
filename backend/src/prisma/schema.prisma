@@ -79,7 +79,8 @@ model Person {
   password String? @db.VarChar(100)
 
   nip String? @db.VarChar(20)
-  digitalSignature String? @db.Text
+  publicKey String? @db.Text
+  privateKey String? @db.Text
 
   nonce     String?  @db.VarChar(100)
   createdAt DateTime @default(now())

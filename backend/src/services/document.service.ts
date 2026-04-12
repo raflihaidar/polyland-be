@@ -46,6 +46,10 @@ export const generateQRDoc = async (txHash: string) => {
   return qrBase64;
 };
 
+export const generateQRSignature = async () => {
+  return "signature"
+}
+
 export const generateNIB = async (
   provinceCode: number,
   regencyCode: number,
