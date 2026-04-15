@@ -136,6 +136,7 @@ export const submitApplication = async (
       province_code,
       regency_code,
       _tempFolder,
+      nib
     } = req.body;
 
     const payload: ApplicationCreate = {
@@ -153,6 +154,7 @@ export const submitApplication = async (
       regency_code : Number(regency_code),
       cert_number,
       cert_type,
+      nib,
       cert_file: files.cert_file![0],
       ktp_penjual: files.ktp_penjual![0],
       kk_pembeli: files.kk_pembeli![0],

@@ -95,6 +95,7 @@ model Person {
   roles                RolePerson[]
   landOffice           LandOffice?           @relation(fields: [land_office_id], references: [id])
   certificateOwners    CertificateOwner[]
+  applicationOwners ApplicationOwner[]
   headOfLandOffice LandOffice? @relation("HeadOffice")
 
   @@map("persons")
@@ -258,6 +259,7 @@ model Application {
 
   status ApplicationStatus @default(DIPROSES)
   type   CertificateType
+  nib    String @unique @db.VarChar(100)
 
   file_number       String @unique @db.VarChar(100)
   land_price_per_m2 Int    @db.Integer
@@ -275,6 +277,7 @@ model Application {
   landOffice           LandOffice            @relation(fields: [land_office_id], references: [id])
   officer              Person?               @relation("ApplicationOfficer", fields: [officer_id], references: [id])
   applicationDocuments ApplicationDocument[]
+  owners ApplicationOwner[]
   personId             String?               @db.Uuid
   certificate          Certificate?
 
@@ -298,6 +301,20 @@ model ApplicationDocument {
   application Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
 
   @@map("application_documents")
+}
+
+model ApplicationOwner {
+  id String @id @default(uuid()) @db.Uuid
+
+  application_id String @db.Uuid
+  person_id String @db.Uuid
+
+  sharePercent Int?
+
+  application Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [person_id], references: [id])
+
+  @@map("application_owners")
 }
 
 model FileCounter {

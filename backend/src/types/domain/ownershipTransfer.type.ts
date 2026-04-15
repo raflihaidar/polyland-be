@@ -4,6 +4,11 @@ export interface Application {
   
 }
 
+interface ApplicationOwnerInput {
+  person_id: string
+  sharePercent?: number
+}
+
 export interface ApplicationCreate {
   person_id: string;
   land_id?: string;
@@ -24,6 +29,7 @@ export interface ApplicationCreate {
   // Certificate
   cert_number: string;
   cert_type: CertificateType;
+  nib : string;
 
   // Dokumen
   cert_file: Express.Multer.File;
@@ -34,4 +40,7 @@ export interface ApplicationCreate {
   fc_sppt: Express.Multer.File;
   fc_pbb: Express.Multer.File;
   ssb: Express.Multer.File;
+
+  // Application Owner
+  owners: ApplicationOwnerInput[]
 }

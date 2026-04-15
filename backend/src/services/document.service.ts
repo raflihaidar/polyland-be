@@ -8,8 +8,10 @@ import { imageToBase64 } from "../utils/parse";
 import { publishCertificate } from "./certificate.service";
 import { CertificateStatus } from "../generated/prisma/enums";
 import QRCode from "qrcode";
+import crypto from "crypto";
 import CryptoJS from "crypto-js";
 import { AppError } from "../utils/error";
+import { findHeadOfficeByLandOffice } from "./officer.service";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,8 +48,27 @@ export const generateQRDoc = async (txHash: string) => {
   return qrBase64;
 };
 
-export const generateQRSignature = async () => {
-  return "signature"
+export const generateQRSignature = async (payload: string, encryptedPrivateKey: string) => {
+  const decryptedPrivateKey = CryptoJS.AES.decrypt(
+    encryptedPrivateKey,
+    process.env.KEY_SECRET as string
+  ).toString(CryptoJS.enc.Utf8);
+
+  const signature = crypto.sign(
+    null,
+    Buffer.from(payload),
+    decryptedPrivateKey
+  );
+
+  const data = {
+    ...JSON.parse(payload),
+    timestamp: new Date().toISOString(),
+    signature : signature.toString("base64")
+  }
+
+  const qrCode = await QRCode.toDataURL(JSON.stringify(data));
+
+  return qrCode
 }
 
 export const generateNIB = async (
@@ -107,7 +128,7 @@ export const generateNIB = async (
 export const buildCertificateAssets = async (
   application: any,
   txHash: string,
-  existingNIB : boolean
+  headOffice : any
 ) => {
 
   const templatePath = path.join(
@@ -141,13 +162,25 @@ export const buildCertificateAssets = async (
 
   const code = generateUniqueCode(6);
   let nib;
-  if(!existingNIB){
+  if(!application.nib){
     nib = await generateNIB(application?.land?.province_code, application?.land?.regency_code, 1);
   }else{
-    nib = existingNIB
+    nib = application.nib
   }
 
   const qr_doc = await generateQRDoc(txHash);
+
+  const payload = JSON.stringify({
+    code,
+    txHash,
+    nib,
+    owner: application.person.name,
+  });
+
+  const qr_signature = generateQRSignature(
+    payload,
+    headOffice.encryptedPrivateKey
+  );
 
   return {
     htmlTemplate,
@@ -155,6 +188,7 @@ export const buildCertificateAssets = async (
     code,
     nib,
     qr_doc,
+    qr_signature
   };
 };
 
@@ -187,8 +221,6 @@ export const generatePDF = async (html: string) => {
 };
 
 export const generateCertificate = async (fileNumber: string, txHash: string) => {
-
-
   const application = await prisma.application.findUnique({
     where: { file_number: fileNumber },
     include: {
@@ -207,7 +239,9 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
     throw new AppError("Sertifikat sudah pernah diterbitkan untuk permohonan ini", 400);
   }
 
-  const { htmlTemplate, garudaImage, code, nib, qr_doc } = await buildCertificateAssets(application, txHash)
+  const headOffice = await findHeadOfficeByLandOffice(application.land_office_id)
+
+  const { htmlTemplate, garudaImage, code, nib, qr_doc, qr_signature } = await buildCertificateAssets(application, txHash, headOffice)
 
   const template = handlebars.compile(htmlTemplate);
 
@@ -220,8 +254,6 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
   const selectedCertificateType = certificateType.find(
     item => item.value === application.type
   );
-
-  const qr_ttd = "";
 
   try {
     await publishCertificate({
@@ -247,14 +279,13 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
       subdistrict: application.land.subdistrict,
       regency: application.land.regency,
       province: application.land.province,
-      nama_kepala_kantor:
-        application.landOffice.head_office,
-      nip: application.landOffice.nip,
+      nama_kepala_kantor: headOffice.name,
+      nip: headOffice.nip,
       nama_kabupaten:
         application.land.regency,
       nib,
       catatan_list: application.notes ?? "-",
-      qr_ttd,
+      qr_signature,
       qr_doc,
     });
 

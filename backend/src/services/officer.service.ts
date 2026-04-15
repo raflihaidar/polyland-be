@@ -1,9 +1,9 @@
 import { prisma } from "../config/prisma";
 import { AppError } from "../utils/error";
-import { PersonCreateInput } from "../generated/prisma/models";
 import { VerificationStatus } from "../generated/prisma/enums";
-
+import { OfficerCreate } from "../types/domain/officer.type";
 import crypto from "crypto";
+import bcrypt from "bcrypt";
 import CryptoJS from "crypto-js";
 
 export const generateSignatureKeyPair = () => {
@@ -13,11 +13,11 @@ export const generateSignatureKeyPair = () => {
     publicKey: publicKey.export({
       type: "spki",
       format: "pem",
-    }),
+    }).toString(),
     privateKey: privateKey.export({
       type: "pkcs8",
       format: "pem",
-    }),
+    }).toString(),
   };
 }
 
@@ -38,7 +38,7 @@ export const decryptPrivateKey = (ciphertext : string) => {
   return bytes.toString(CryptoJS.enc.Utf8);
 }
 
-export const createHeadOfficer = async (payload: PersonCreateInput) => {
+export const createHeadOfficer = async (payload: OfficerCreate) => {
     try {
         const {
             name,
@@ -51,29 +51,34 @@ export const createHeadOfficer = async (payload: PersonCreateInput) => {
             gender,
             address,
             nip,
-            digitalSignature,
-            nik
+            nik,
+            land_office_id
         } = payload
 
         const { publicKey, privateKey } = generateSignatureKeyPair();
 
-        const encryptedPrivateKey = encryptPrivateKey(privateKey);
+        const encryptedPrivateKey = encryptPrivateKey(privateKey as string);
+
+        const hashedPassword = await bcrypt.hash(password.trim(), 10);
 
         const headOfficer = await prisma.person.create({
             data: {
                 name,
                 username,
+                password : hashedPassword,
                 email,
-                password,
                 birthDate,
                 birthPlace,
                 phone,
                 gender,
                 address,
                 nip,
+                nik,
                 publicKey,
-                privateKey : 
-
+                privateKey : encryptedPrivateKey,
+                isVerified : true,
+                verifiedAt : new Date(),
+                land_office_id
             }
         })
 
@@ -90,7 +95,36 @@ export const createHeadOfficer = async (payload: PersonCreateInput) => {
                 status: VerificationStatus.APPROVED,
             }
         })
+
+        await prisma.rolePerson.create({
+          data : {
+            role_id : 4,
+            person_id : headOfficer.id
+          }
+        })
     } catch (error : any) {
         throw new AppError("Gagal menambahkan kepala kantah", 500, error.meta);
     }
+}
+
+
+export const findHeadOfficeByLandOffice = async (land_office_id : string) => {
+  try {
+    const headOffice =  await prisma.person.findFirst({
+      where : {
+        land_office_id
+      }
+    })
+
+    if(!headOffice){
+      throw new AppError("Kepala kantah tidak ditemukan", 404);
+    }
+
+    return headOffice
+  } catch (error : any) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw new AppError("Gagal mencari kepala kantah", 500, error.meta);
+  }
 }

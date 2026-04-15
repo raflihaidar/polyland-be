@@ -10,7 +10,7 @@ export const seedRoles = async (prisma: PrismaClient) => {
       { name: "kanwil" },
       { name: "admin kantah" },
       { name: "registration_officer" },
-      { name: "land_surveyor" },
+      { name: "kepala kantah" },
       { name: "citizen" },
       { name: "guest" },
     ],

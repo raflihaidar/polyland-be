@@ -15,6 +15,7 @@ import ownershipTFRouter from "./routes/ownershipTransfer.route";
 import mitraRouter from "./routes/mitra.route";
 import landOfficeRouter from "./routes/landOffice.route";
 import documentRouter from "./routes/document.route"
+import officerRouter from "./routes/officer.route"
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler";
 // import { initSocket } from "./config/socket"
@@ -39,6 +40,7 @@ app.use("/api/verification-account", verifAccountRouter);
 app.use("/api/ownership-transfer", ownershipTFRouter);
 app.use("/api/land-office", landOfficeRouter)
 app.use("/api/document", documentRouter)
+app.use("/api/officer", officerRouter)
 app.use(errorHandler);
 
 const pinata = new PinataSDK({

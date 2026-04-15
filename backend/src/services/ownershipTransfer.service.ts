@@ -199,7 +199,7 @@ export const searchApplication = async (
 };
 
 export const submitApplication = async (
-  data: ApplicationCreate,
+  data: ApplicationCreate
 ) => {
   try {
     return await prisma.$transaction(async (tx) => {
@@ -225,8 +225,6 @@ export const submitApplication = async (
 
       const file_number = `${data.cert_type}-${year}-${formattedNumber}`
 
-      console.log("data : ", data)
-
       const land = await tx.land.create({
         data: {
           area_size: data.area_size,
@@ -237,27 +235,27 @@ export const submitApplication = async (
           subdistrict: data.subdistrict ?? "",
           regency: data.regency ?? "",
           province: data.province ?? "",
-          province_code : data.province_code,
-          regency_code : data.regency_code
-        },
-      });
+          province_code: data.province_code,
+          regency_code: data.regency_code
+        }
+      })
 
       const price = await tx.landOfficePrice.findFirst({
         where: {
           land_office_id: data.land_office_id
         }
-      });
+      })
 
       if (!price) {
-        throw new AppError("Harga tanah kantor belum diatur", 400);
+        throw new AppError("Harga tanah kantor belum diatur", 400)
       }
 
-      const landArea = Number(data.area_size);
+      const landArea = Number(data.area_size)
 
-      const landValue = price.price_per_m2 * landArea;
+      const landValue = price.price_per_m2 * landArea
 
       const total_fee =
-        landValue / 1000 + price.registration_fee;
+        landValue / 1000 + price.registration_fee
 
       const application = await tx.application.create({
         data: {
@@ -268,20 +266,34 @@ export const submitApplication = async (
           file_number: file_number,
           land_price_per_m2: price.price_per_m2,
           registration_fee: price.registration_fee,
-          total_fee: Math.round(total_fee)
+          total_fee: Math.round(total_fee),
+          nib: data.nib,
+
+          owners: data.owners
+            ? {
+                create: data.owners.map(owner => ({
+                  person_id: owner.person_id,
+                  sharePercent: owner.sharePercent
+                }))
+              }
+            : undefined
         },
-      });
+        include: {
+          owners: true
+        }
+      })
 
       return {
         ...application,
         total_fee: Number(application.total_fee)
-      };
-    });
+      }
+
+    })
   } catch (error) {
     console.log("error : ", error)
-    throw new AppError("Gagal submit application", 500);
+    throw new AppError("Gagal submit application", 500)
   }
-};
+}
 
 const documentTypeMap: Record<string, string> = {
   cert_file: "CERT_FILE",

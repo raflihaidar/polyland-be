@@ -2,5 +2,9 @@ import { Person } from "../person.type";
 
 export interface OfficerCreate extends Person {
     nip: string
-    digitalSignature: string
+    digitalSignature: string,
+    birthPlace : string,
+    birthDate : Date,
+    gender : "LAKI_LAKI" | "PEREMPUAN",
+    land_office_id : string
 }

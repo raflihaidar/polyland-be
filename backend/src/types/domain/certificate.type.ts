@@ -4,7 +4,6 @@ export interface CertificateCreate {
     nib : string;
     code : string;
     land_id : string;
-    owner_id : string;
     application_id : string;
     cid? : string;
     status : CertificateStatus;
