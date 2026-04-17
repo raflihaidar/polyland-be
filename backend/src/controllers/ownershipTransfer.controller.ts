@@ -6,63 +6,81 @@ import { ApplicationStatus } from "../generated/prisma/enums";
 import fs from "fs";
 import path from "path";
 
-
-export const getListApplication = async (req: Request, res: Response, next: NextFunction) => {
+export const getListApplication = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-    const { land_office_id } = req.params
-    const {page, limit, search} = req.query
+    const { land_office_id } = req.params;
+    const { page, limit, search } = req.query;
 
-    console.log("query : ", req.query)
+    if (!land_office_id) throw new AppError("Id kantor pertanahan kosong", 403);
 
-    if (!land_office_id) throw new AppError('Id kantor pertanahan kosong', 403)
-
-    const result = await ownershipService.getListApplication(land_office_id as string, Number(page), Number(limit), search as string);
+    const result = await ownershipService.getListApplication(
+      land_office_id as string,
+      Number(page),
+      Number(limit),
+      search as string,
+    );
 
     res.status(200).json({
-      message : 'application berhasil didapatkan',
-      data : result
-    })
+      message: "application berhasil didapatkan",
+      data: result,
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
-
-export const getApplication = async (req: Request, res: Response, next: NextFunction) => {
+export const getApplication = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-    const { id } = req.params
+    const { id } = req.params;
 
-    if (!id) throw new AppError('Permohonan tidak ditemukan', 404)
+    if (!id) throw new AppError("Permohonan tidak ditemukan", 404);
 
     const result = await ownershipService.getApplication(id as string);
 
     res.status(200).json({
-      message : 'application berhasil didapatkan',
-      data : result
-    })
+      message: "application berhasil didapatkan",
+      data: result,
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
-export const searchApplication = async (req: Request, res: Response, next: NextFunction) => {
+export const searchApplication = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-    const { fileNumber } = req.query
-    const person_id = req.person?.id
+    const { fileNumber } = req.query;
+    const person_id = req.person?.id;
 
-    if (!fileNumber) throw new AppError('Berkas tidak ditemukan', 404)
+    if (!fileNumber) throw new AppError("Berkas tidak ditemukan", 404);
 
-    const result = await ownershipService.searchApplication(fileNumber as string, person_id);
+    const result = await ownershipService.searchApplication(
+      fileNumber as string,
+      person_id,
+    );
 
     res.status(200).json({
-      status : !result ? 'not found' : 'success',
-      message : !result ? 'Berkas tidak ditemukan' : 'Berkas berhasil didapatkan',
-      data : result
-    })
+      status: !result ? "not found" : "success",
+      message: !result
+        ? "Berkas tidak ditemukan"
+        : "Berkas berhasil didapatkan",
+      data: result,
+    });
   } catch (error) {
-    next(error)
+    next(error);
   }
-}
+};
 
 export const submitApplication = async (
   req: Request,
@@ -70,7 +88,8 @@ export const submitApplication = async (
   next: NextFunction,
 ) => {
   try {
-    const person_id = req.person?.id
+    const person_id = req.person?.id;
+
     const files = req.files as {
       cert_file?: Express.Multer.File[];
       ktp_penjual?: Express.Multer.File[];
@@ -86,7 +105,7 @@ export const submitApplication = async (
       throw new AppError("File wajib diupload", 400);
     }
 
-    //validasi wajib
+    // VALIDASI FILE WAJIB
     const requiredFiles: Record<string, string> = {
       cert_file: "File Sertifikat Tanah",
       ktp_penjual: "KTP Penjual",
@@ -121,53 +140,48 @@ export const submitApplication = async (
       }
     }
 
-    const {
-      area_size,
-      land_office_id,
-      street_address,
-      rt,
-      rw,
-      ward,
-      subdistrict,
-      regency,
-      province,
-      cert_number,
-      cert_type,
-      province_code,
-      regency_code,
-      _tempFolder,
-      nib
-    } = req.body;
+    const { land_office_id, cert_code, cert_type, nib, land_id } = req.body;
+
+    console.log("owners : ", req.body.owners);
 
     const payload: ApplicationCreate = {
       person_id,
-      street_address,
-      rt,
-      rw,
-      area_size,
       land_office_id,
-      ward,
-      subdistrict,
-      regency,
-      province,
-      province_code : Number(province_code),
-      regency_code : Number(regency_code),
-      cert_number,
+      land_id,
+      cert_code,
       cert_type,
       nib,
+
       cert_file: files.cert_file![0],
-      ktp_penjual: files.ktp_penjual![0],
-      kk_pembeli: files.kk_pembeli![0],
-      ktp_pembeli: files.ktp_pembeli![0],
       akta_jual_beli: files.akta_jual_beli![0],
+
+      ktp_penjual: files.ktp_penjual!.map((file, index) => ({
+        file,
+        person_id: req.body.ktp_penjual_person_ids?.[index],
+      })),
+
+      ktp_pembeli: files.ktp_pembeli!.map((file, index) => ({
+        file,
+        person_id: req.body.ktp_pembeli_person_ids?.[index],
+      })),
+
+      kk_pembeli: files.kk_pembeli!.map((file, index) => ({
+        file,
+        person_id: req.body.kk_pembeli_person_ids?.[index],
+      })),
+
       fc_sppt: files.fc_sppt![0],
       fc_pbb: files.fc_pbb![0],
       ssb: files.ssb![0],
+
+      owners: Array.isArray(req.body.owners)
+        ? req.body.owners
+        : req.body.owners
+          ? JSON.parse(req.body.owners)
+          : [],
     };
 
-    const result = await ownershipService.submitApplication(
-      payload,
-    );
+    const result = await ownershipService.submitApplication(payload);
 
     res.status(201).json({
       status: "success",
@@ -191,6 +205,7 @@ export const submitApplication = async (
         fs.rmSync(tempPath, { recursive: true, force: true });
       }
     }
+
     next(error);
   }
 };
@@ -201,7 +216,7 @@ export const updateApplicationStatus = async (
   next: NextFunction,
 ) => {
   try {
-    const { fileNumber } = req.params;
+    const { fileNumber } = req.query;
     const { note, status } = req.body;
 
     const result = await ownershipService.updateApplicationStatus(

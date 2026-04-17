@@ -20,17 +20,14 @@ export const generateUniqueCode = (length = 6): string => {
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-  const randomSeed =
-    Date.now().toString() + Math.random().toString();
+  const randomSeed = Date.now().toString() + Math.random().toString();
 
   const hash = CryptoJS.SHA256(randomSeed).toString();
 
   let result = "";
 
   for (let i = 0; i < length; i++) {
-    const index =
-      parseInt(hash.substring(i * 2, i * 2 + 2), 16) %
-      chars.length;
+    const index = parseInt(hash.substring(i * 2, i * 2 + 2), 16) % chars.length;
 
     result += chars[index];
   }
@@ -39,79 +36,73 @@ export const generateUniqueCode = (length = 6): string => {
 };
 
 export const generateQRDoc = async (txHash: string) => {
-
-  const url =
-    `${process.env.APP_URL}/verify/document/${txHash}`;
+  const url = `${process.env.APP_URL}/verify/document/${txHash}`;
 
   const qrBase64 = await QRCode.toDataURL(url);
 
   return qrBase64;
 };
 
-export const generateQRSignature = async (payload: string, encryptedPrivateKey: string) => {
+export const generateQRSignature = async (
+  payload: string,
+  encryptedPrivateKey: string,
+) => {
   const decryptedPrivateKey = CryptoJS.AES.decrypt(
     encryptedPrivateKey,
-    process.env.KEY_SECRET as string
+    process.env.KEY_SECRET as string,
   ).toString(CryptoJS.enc.Utf8);
 
   const signature = crypto.sign(
     null,
     Buffer.from(payload),
-    decryptedPrivateKey
+    decryptedPrivateKey,
   );
 
   const data = {
     ...JSON.parse(payload),
     timestamp: new Date().toISOString(),
-    signature : signature.toString("base64")
-  }
+    signature: signature.toString("base64"),
+  };
 
   const qrCode = await QRCode.toDataURL(JSON.stringify(data));
 
-  return qrCode
-}
+  return qrCode;
+};
 
 export const generateNIB = async (
   provinceCode: number,
   regencyCode: number,
-  indeksLetak: number
+  indeksLetak: number,
 ) => {
   if (indeksLetak < 0 || indeksLetak > 9) {
     throw new Error("Indeks letak harus antara 0 - 9");
   }
 
-  // ambil nomor urut terakhir di wilayah tersebut
-  const lastLand = await prisma.land.findFirst({
+  const lastCertificate = await prisma.certificate.findFirst({
     where: {
-      province_code: provinceCode,
-      regency_code: regencyCode,
+      land: {
+        province_code: provinceCode,
+        regency_code: regencyCode,
+      },
     },
     orderBy: {
-      createdAt: "desc",
+      nib: "desc", // penting!
     },
-    include: {
-      certificates: {
-        select: {
-          nib: true
-        }
-      }
+    select: {
+      nib: true,
     },
   });
 
   let nextSequence = 1;
 
-  lastLand?.certificates.forEach((item) => {
-    if (item.nib) {
-      const lastSequence = item.nib.slice(4, 13); // ambil 9 digit tengah
-      nextSequence = parseInt(lastSequence) + 1;
-    }
-  })
+  if (lastCertificate?.nib) {
+    const lastSequence = lastCertificate.nib.slice(6, 15);
+    nextSequence = parseInt(lastSequence) + 1;
+  }
 
-  const sequenceFormatted = nextSequence
-    .toString()
-    .padStart(9, "0");
+  const sequenceFormatted = nextSequence.toString().padStart(9, "0");
 
-  let formatedRegencyCode = regencyCode % 100
+  const formatedRegencyCode = regencyCode % 100;
 
   const nib =
     provinceCode.toString().padStart(2, "0") +
@@ -128,44 +119,35 @@ export const generateNIB = async (
 export const buildCertificateAssets = async (
   application: any,
   txHash: string,
-  headOffice : any
+  headOffice: any,
 ) => {
+  const templatePath = path.join(__dirname, "../templates/certificate.html");
 
-  const templatePath = path.join(
-    __dirname,
-    "../templates/certificate.html"
-  );
+  const templateHtml = fs.readFileSync(templatePath, "utf-8");
 
-  const templateHtml = fs.readFileSync(
-    templatePath,
-    "utf-8"
-  );
-
-  const cssPath = path.join(
-    __dirname,
-    "../templates/certificate.css"
-  );
+  const cssPath = path.join(__dirname, "../templates/certificate.css");
 
   const css = fs.readFileSync(cssPath, "utf-8");
 
   const htmlTemplate = templateHtml.replace(
     "</head>",
-    `<style>${css}</style></head>`
-  )
-
-  const garudaPath = path.join(
-    __dirname,
-    "../assets/lambang-pancasila.png"
+    `<style>${css}</style></head>`,
   );
+
+  const garudaPath = path.join(__dirname, "../assets/lambang-pancasila.png");
 
   const garudaImage = imageToBase64(garudaPath);
 
   const code = generateUniqueCode(6);
   let nib;
-  if(!application.nib){
-    nib = await generateNIB(application?.land?.province_code, application?.land?.regency_code, 1);
-  }else{
-    nib = application.nib
+  if (!application.nib) {
+    nib = await generateNIB(
+      application?.land?.province_code,
+      application?.land?.regency_code,
+      1,
+    );
+  } else {
+    nib = application.nib;
   }
 
   const qr_doc = await generateQRDoc(txHash);
@@ -179,7 +161,7 @@ export const buildCertificateAssets = async (
 
   const qr_signature = generateQRSignature(
     payload,
-    headOffice.encryptedPrivateKey
+    headOffice.encryptedPrivateKey,
   );
 
   return {
@@ -188,12 +170,11 @@ export const buildCertificateAssets = async (
     code,
     nib,
     qr_doc,
-    qr_signature
+    qr_signature,
   };
 };
 
 export const generatePDF = async (html: string) => {
-
   const browser = await puppeteer.launch({
     headless: true,
   });
@@ -220,14 +201,17 @@ export const generatePDF = async (html: string) => {
   return pdfBuffer;
 };
 
-export const generateCertificate = async (fileNumber: string, txHash: string) => {
+export const generateCertificate = async (
+  fileNumber: string,
+  txHash: string,
+) => {
   const application = await prisma.application.findUnique({
     where: { file_number: fileNumber },
     include: {
       land: true,
       person: true,
       landOffice: true,
-      certificate : true
+      certificate: true,
     },
   });
 
@@ -235,13 +219,19 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
     throw new Error("Application tidak ditemukan");
   }
 
-  if(application.certificate){
-    throw new AppError("Sertifikat sudah pernah diterbitkan untuk permohonan ini", 400);
+  if (application.certificate) {
+    throw new AppError(
+      "Sertifikat sudah pernah diterbitkan untuk permohonan ini",
+      400,
+    );
   }
 
-  const headOffice = await findHeadOfficeByLandOffice(application.land_office_id)
+  const headOffice = await findHeadOfficeByLandOffice(
+    application.land_office_id,
+  );
 
-  const { htmlTemplate, garudaImage, code, nib, qr_doc, qr_signature } = await buildCertificateAssets(application, txHash, headOffice)
+  const { htmlTemplate, garudaImage, code, nib, qr_doc, qr_signature } =
+    await buildCertificateAssets(application, txHash, headOffice);
 
   const template = handlebars.compile(htmlTemplate);
 
@@ -252,7 +242,7 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
   ];
 
   const selectedCertificateType = certificateType.find(
-    item => item.value === application.type
+    (item) => item.value === application.type,
   );
 
   try {
@@ -264,8 +254,8 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
       owner_id: application.person_id,
       status: CertificateStatus.AKTIF,
       type: application.type,
-      application_id : application.id
-    })
+      application_id: application.id,
+    });
 
     const html = template({
       garuda_path: garudaImage,
@@ -281,8 +271,7 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
       province: application.land.province,
       nama_kepala_kantor: headOffice.name,
       nip: headOffice.nip,
-      nama_kabupaten:
-        application.land.regency,
+      nama_kabupaten: application.land.regency,
       nib,
       catatan_list: application.notes ?? "-",
       qr_signature,
@@ -297,16 +286,16 @@ export const generateCertificate = async (fileNumber: string, txHash: string) =>
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    const filePath = path.join(
-      uploadDir,
-      `${application.file_number}.pdf`
-    );
+    const filePath = path.join(uploadDir, `${application.file_number}.pdf`);
 
     fs.writeFileSync(filePath, pdfBuffer);
 
     return pdfBuffer;
   } catch (error) {
-    console.log(error)
-    throw new AppError(`Terjadi kesalahan pada saat generate certificate dengan code ${code}`, 400);
+    console.log(error);
+    throw new AppError(
+      `Terjadi kesalahan pada saat generate certificate dengan code ${code}`,
+      400,
+    );
   }
 };

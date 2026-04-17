@@ -3,12 +3,15 @@ import { seedRoles } from "./role.seed";
 import { seedModules } from "./module.seed";
 import { seedRolePrivileges } from "./role-privilege.seed";
 import { landOfficeModules } from "./landOffice.seed";
+import { districtModule } from "./district.seed";
+import { villageModule } from "./village.seed";
+import { landCertificateModule } from "./land-certificate.seed";
 
 const main = async () => {
   const args = process.argv.slice(2);
   const target = args[0];
 
-  console.log("target : ", target)
+  console.log("target : ", target);
 
   switch (target) {
     case "role":
@@ -23,9 +26,18 @@ const main = async () => {
     case "land-office":
       await landOfficeModules(prisma);
       break;
+    case "district":
+      await districtModule(prisma);
+      break;
+    case "village":
+      await villageModule(prisma);
+      break;
+    case "land-certificate":
+      await landCertificateModule(prisma);
+      break;
     default:
       console.log(
-        "Please specify a valid seed target (role, module, permissions)",
+        "Please specify a valid seed target (role, module, permissions, district, village)",
       );
   }
 };

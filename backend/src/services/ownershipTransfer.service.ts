@@ -3,14 +3,18 @@ import { Prisma } from "../generated/prisma/client";
 import { AppError } from "../utils/error";
 import { ApplicationCreate } from "../types/domain/ownershipTransfer.type";
 import { DocumentType, ApplicationStatus } from "../generated/prisma/enums";
+import * as fileCounterService from "./fileCounter.service";
+import * as landService from "./land.service";
+import * as AppDocumentService from "./applicationDocument.service";
 import fs from "fs";
 import { serializeBigInt } from "../utils/parse";
+import { connect } from "http2";
 
 export const getListApplication = async (
   land_office_id: string,
   page = 1,
   limit = 10,
-  search?: string
+  search?: string,
 ) => {
   try {
     if (!land_office_id) {
@@ -84,7 +88,7 @@ export const getListApplication = async (
     ]);
 
     return serializeBigInt({
-      applications : data,
+      applications: data,
       meta: {
         page,
         limit,
@@ -118,16 +122,16 @@ export const getApplication = async (id: string) => {
         },
         landOffice: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         person: {
           select: {
             name: true,
             nik: true,
             phone: true,
-            address: true
-          }
+            address: true,
+          },
         },
       },
     });
@@ -145,20 +149,20 @@ export const getApplication = async (id: string) => {
 
 export const searchApplication = async (
   search: string | undefined,
-  currentUserId: string
+  currentUserId: string,
 ) => {
   try {
     const application = await prisma.application.findFirst({
       where: search
         ? {
-          file_number: search
-        }
+            file_number: search,
+          }
         : {},
       include: {
         officer: {
           select: {
-            name: true
-          }
+            name: true,
+          },
         },
         person: {
           select: {
@@ -168,8 +172,8 @@ export const searchApplication = async (
         },
         land: {
           select: {
-            area_size: true
-          }
+            area_size: true,
+          },
         },
         landOffice: {
           select: {
@@ -177,9 +181,9 @@ export const searchApplication = async (
             code: true,
             address: true,
             email: true,
-            phone: true
-          }
-        }
+            phone: true,
+          },
+        },
       },
     });
 
@@ -198,102 +202,93 @@ export const searchApplication = async (
   }
 };
 
-export const submitApplication = async (
-  data: ApplicationCreate
-) => {
+export const submitApplication = async (data: ApplicationCreate) => {
   try {
     return await prisma.$transaction(async (tx) => {
+      const year = new Date().getFullYear().toString().slice(-2);
 
-      const year = new Date().getFullYear()
+      const lastNumber = await fileCounterService.increment(tx);
 
-      let counter = await tx.fileCounter.findUnique({
-        where: { id: 1 }
-      })
+      const land = await landService.findById(tx, data.land_id);
 
-      if (!counter) {
-        counter = await tx.fileCounter.create({
-          data: { id: 1, value: 0 }
-        })
+      const landOffice = await tx.landOffice.findFirst({
+        where: { id: data.land_office_id },
+        include: { price: true },
+      });
+
+      if (!landOffice?.price) {
+        throw new AppError("Harga tanah kantor belum diatur", 400);
       }
 
-      const updatedCounter = await tx.fileCounter.update({
-        where: { id: 1 },
-        data: { value: { increment: 1 } }
-      })
-
-      const formattedNumber = String(updatedCounter.value).padStart(3, "0")
-
-      const file_number = `${data.cert_type}-${year}-${formattedNumber}`
-
-      const land = await tx.land.create({
-        data: {
-          area_size: data.area_size,
-          street_address: data.street_address ?? "",
-          rt: data.rt ?? "",
-          rw: data.rw ?? "",
-          ward: data.ward ?? "",
-          subdistrict: data.subdistrict ?? "",
-          regency: data.regency ?? "",
-          province: data.province ?? "",
-          province_code: data.province_code,
-          regency_code: data.regency_code
-        }
-      })
-
-      const price = await tx.landOfficePrice.findFirst({
-        where: {
-          land_office_id: data.land_office_id
-        }
-      })
-
-      if (!price) {
-        throw new AppError("Harga tanah kantor belum diatur", 400)
+      if (!land) {
+        throw new AppError("Data tanah tidak ditemukan", 400);
       }
 
-      const landArea = Number(data.area_size)
+      if (!land.area_size) {
+        throw new AppError("Data tanah tidak memiliki luas", 400);
+      }
 
-      const landValue = price.price_per_m2 * landArea
+      const file_number = `${landOffice.code}/${data.cert_type}/${year}/${lastNumber}`;
 
-      const total_fee =
-        landValue / 1000 + price.registration_fee
+      const areaSize = Number(land.area_size) || 0;
+      const pricePerM2 = Number(landOffice.price.price_per_m2) || 0;
+      const registrationFee = Number(landOffice.price.registration_fee) || 0;
+
+      const landValue = areaSize * pricePerM2;
+      const adminFee = landValue / 1000;
+      const totalFeeCalculated = adminFee + registrationFee;
+
+      const finalTotalFee = isNaN(totalFeeCalculated)
+        ? 0
+        : Math.round(totalFeeCalculated);
 
       const application = await tx.application.create({
         data: {
-          person_id: data.person_id,
-          land_id: land.id,
-          land_office_id: data.land_office_id,
-          type: data.cert_type,
-          file_number: file_number,
-          land_price_per_m2: price.price_per_m2,
-          registration_fee: price.registration_fee,
-          total_fee: Math.round(total_fee),
+          person: {
+            connect: { id: data.person_id },
+          },
+          land: {
+            connect: { id: data.land_id },
+          },
+          landOffice: {
+            connect: { id: data.land_office_id },
+          },
+          file_number,
+          land_price_per_m2: landOffice.price.price_per_m2,
+          registration_fee: landOffice.price.registration_fee,
+          total_fee: BigInt(finalTotalFee),
           nib: data.nib,
-
-          owners: data.owners
-            ? {
-                create: data.owners.map(owner => ({
-                  person_id: owner.person_id,
-                  sharePercent: owner.sharePercent
-                }))
-              }
-            : undefined
+          type: data.cert_type,
         },
-        include: {
-          owners: true
-        }
-      })
+      });
+
+      const documents = AppDocumentService.mapApplicationDocuments(
+        application.id,
+        data,
+      );
+
+      await tx.applicationDocument.createMany({
+        data: documents,
+      });
+
+      await tx.applicationOwner.createMany({
+        data: data.owners.map((owner) => ({
+          application_id: application.id,
+          person_id: owner.person_id,
+          sharePercent: Number(owner.sharePercent) ?? null,
+        })),
+      });
 
       return {
         ...application,
-        total_fee: Number(application.total_fee)
-      }
-
-    })
+        total_fee: Number(application.total_fee),
+      };
+    });
   } catch (error) {
-    console.log("error : ", error)
-    throw new AppError("Gagal submit application", 500)
+    console.log("error : ", error);
+    throw new AppError("Gagal submit application", 500);
   }
-}
+};
 
 const documentTypeMap: Record<string, string> = {
   cert_file: "CERT_FILE",
@@ -325,7 +320,7 @@ export const updateApplicationStatus = async (
     }
 
     const updated = await prisma.application.update({
-      where: { file_number : fileNumber },
+      where: { file_number: fileNumber },
       data: {
         status,
         notes: note ?? null,
@@ -334,10 +329,10 @@ export const updateApplicationStatus = async (
 
     return {
       ...updated,
-      total_fee: Number(updated.total_fee)
+      total_fee: Number(updated.total_fee),
     };
   } catch (error) {
-    console.log("error : ", error)
+    console.log("error : ", error);
     throw new AppError("Gagal memproses permohonan", 500);
   }
 };
@@ -447,6 +442,4 @@ export const updateApplication = async (
   return result;
 };
 
-export const paymentVerification = async () => {
-
-}
+export const paymentVerification = async () => {};

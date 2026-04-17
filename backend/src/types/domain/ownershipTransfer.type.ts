@@ -1,46 +1,35 @@
-import { CertificateType } from "../../generated/prisma/client";
-
-export interface Application {
-  
-}
+import { CertificateType } from "../../generated/prisma/enums";
 
 interface ApplicationOwnerInput {
-  person_id: string
-  sharePercent?: number
+  person_id: string;
+  sharePercent?: number;
+}
+
+interface PersonFile {
+  file: Express.Multer.File;
+  person_id: string;
 }
 
 export interface ApplicationCreate {
   person_id: string;
-  land_id?: string;
-  land_office_id : string
 
-  // Land
-  area_size : string
-  street_address?: string;
-  rt?: string;
-  rw?: string;
-  ward?: string;
-  subdistrict?: string;
-  regency?: string;
-  province?: string;
-  province_code : number;
-  regency_code : number;
+  land_id: string;
+  land_office_id: string;
 
-  // Certificate
-  cert_number: string;
+  cert_code: string;
   cert_type: CertificateType;
-  nib : string;
+  nib: string;
 
-  // Dokumen
   cert_file: Express.Multer.File;
-  ktp_penjual: Express.Multer.File;
-  kk_pembeli: Express.Multer.File;
-  ktp_pembeli: Express.Multer.File;
   akta_jual_beli: Express.Multer.File;
+
+  ktp_pembeli: PersonFile[];
+  kk_pembeli: PersonFile[];
+  ktp_penjual: PersonFile[];
+
   fc_sppt: Express.Multer.File;
   fc_pbb: Express.Multer.File;
   ssb: Express.Multer.File;
 
-  // Application Owner
-  owners: ApplicationOwnerInput[]
+  owners: ApplicationOwnerInput[];
 }
