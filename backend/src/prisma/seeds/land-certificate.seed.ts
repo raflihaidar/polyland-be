@@ -8,9 +8,10 @@ import {
   generateNIB,
   generateUniqueCode,
 } from "../../services/document.service";
+import "dotenv/config";
 
 export const landCertificateModule = async (prisma: PrismaClient) => {
-  const PERSON_ID = "953ee7ee-a253-4377-adad-a9873bac1787";
+  const PERSON_ID = process.env.ADMIN_LAND;
 
   function randomRT() {
     return String(faker.number.int({ min: 1, max: 10 })).padStart(3, "0");
