@@ -24,6 +24,7 @@ export const register = async (data: RegisterRequest) => {
           username: data.username,
           email: data.email,
           password: hashedPassword,
+          publicKey: data.publicKey,
         },
       });
 
@@ -65,9 +66,9 @@ export const login = async (email: string) => {
                   select: {
                     privilege: {
                       select: {
-                        action : true,
+                        action: true,
                         module: {
-                          select: { slug : true },
+                          select: { slug: true },
                         },
                       },
                     },
@@ -104,7 +105,6 @@ export const login = async (email: string) => {
       ),
     );
 
-    
     // hapus duplicate permission
     const uniquePermissions = [...new Set(permissions)];
 
@@ -136,7 +136,7 @@ export const login = async (email: string) => {
 
     await redisClient.del(permissionKey);
 
-    console.log("ada permission : ", uniquePermissions.length > 0)
+    console.log("ada permission : ", uniquePermissions.length > 0);
 
     // simpan permission sebagai Redis Set
     if (uniquePermissions.length > 0) {
@@ -168,7 +168,7 @@ export const getUser = async (id: string) => {
         name: true,
         username: true,
         email: true,
-        isVerified : true,
+        isVerified: true,
         roles: {
           include: {
             role: { select: { name: true } },
@@ -236,7 +236,7 @@ export const loginWalletVerify = async (
   signature: `0x${string}`,
 ) => {
   try {
-    console.log("wallet address : ", wallet_address)
+    console.log("wallet address : ", wallet_address);
     const person = await prisma.person.findUnique({
       where: { wallet_address },
       include: {
@@ -244,9 +244,8 @@ export const loginWalletVerify = async (
       },
     });
 
-    console.log("person : ", person)
+    console.log("person : ", person);
 
-    
     if (!person) {
       throw new AppError("Data tidak ditemukan", 404);
     }

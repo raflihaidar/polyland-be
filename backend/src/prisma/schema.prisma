@@ -232,30 +232,42 @@ model Village {
 }
 
 model Certificate {
-  id             String             @id @default(uuid()) @db.Uuid
-  nib            String             @unique @db.VarChar(100)
-  code           String             @unique @db.VarChar(100)
-  land_id        String             @db.Uuid
-  cid            String?            @db.VarChar(255)
-  status         CertificateStatus?
+  id             String            @id @default(uuid()) @db.Uuid
+  nib            String            @db.VarChar(100)
+  code           String            @unique @db.VarChar(100)
+  land_id        String            @db.Uuid
+  cid            String?           @db.VarChar(255)
+  status         CertificateStatus @default(AKTIF)
   type           CertificateType
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @default(now())
-  hash           String?            @db.VarChar(255)
-  application_id String?            @unique @db.Uuid
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @default(now())
+  hash           String?           @db.VarChar(255)
+  application_id String?           @unique @db.Uuid
 
   land        Land               @relation(fields: [land_id], references: [id])
   application Application?       @relation(fields: [application_id], references: [id])
   owners      CertificateOwner[]
+  notes       CertificateNote[]
 
   @@map("certificates")
+}
+
+model CertificateNote {
+  id             String   @id @default(uuid())
+  certificate_id String   @db.Uuid
+  note           String
+  created_at     DateTime @default(now())
+
+  certificate Certificate @relation(fields: [certificate_id], references: [id])
+
+  @@map("certificate_notes")
 }
 
 model CertificateOwner {
   id             String   @id @default(uuid()) @db.Uuid
   certificate_id String   @db.Uuid
   person_id      String   @db.Uuid
-  ownership_pct  Float?   @default(100)
+  ownership_pct  Decimal  @db.Decimal(5, 4)
   createdAt      DateTime @default(now())
 
   certificate Certificate @relation(fields: [certificate_id], references: [id])
@@ -295,6 +307,7 @@ model Application {
   nib    String            @unique @db.VarChar(100)
 
   file_number       String @unique @db.VarChar(100)
+  cert_code         String @unique @db.VarChar(100)
   land_price_per_m2 Int    @db.Integer
   registration_fee  Int    @db.Integer
   total_fee         BigInt @default(0)
@@ -343,7 +356,7 @@ model ApplicationOwner {
   application_id String @db.Uuid
   person_id      String @db.Uuid
 
-  sharePercent Int?
+  share Decimal? @db.Decimal(5, 4)
 
   application Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
   person      Person      @relation(fields: [person_id], references: [id])

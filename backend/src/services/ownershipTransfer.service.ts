@@ -8,7 +8,7 @@ import * as landService from "./land.service";
 import * as AppDocumentService from "./applicationDocument.service";
 import fs from "fs";
 import { serializeBigInt } from "../utils/parse";
-import { connect } from "http2";
+import { moveTempFolder } from "../utils/file";
 
 export const getListApplication = async (
   land_office_id: string,
@@ -202,9 +202,12 @@ export const searchApplication = async (
   }
 };
 
-export const submitApplication = async (data: ApplicationCreate) => {
+export const submitApplication = async (
+  data: ApplicationCreate,
+  tempFolder: string,
+) => {
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const year = new Date().getFullYear().toString().slice(-2);
 
       const lastNumber = await fileCounterService.increment(tx);
@@ -253,6 +256,7 @@ export const submitApplication = async (data: ApplicationCreate) => {
           landOffice: {
             connect: { id: data.land_office_id },
           },
+          cert_code: data.cert_code,
           file_number,
           land_price_per_m2: landOffice.price.price_per_m2,
           registration_fee: landOffice.price.registration_fee,
@@ -275,17 +279,19 @@ export const submitApplication = async (data: ApplicationCreate) => {
         data: data.owners.map((owner) => ({
           application_id: application.id,
           person_id: owner.person_id,
-          sharePercent: Number(owner.sharePercent) ?? null,
+          share: Number(owner.share) ?? null,
         })),
       });
 
-      return {
-        ...application,
-        total_fee: Number(application.total_fee),
-      };
+      return application;
     });
+
+    moveTempFolder(tempFolder, `applications/${result.id}`);
+    return {
+      ...result,
+      total_fee: Number(result.total_fee),
+    };
   } catch (error) {
-    console.log("error : ", error);
     throw new AppError("Gagal submit application", 500);
   }
 };
@@ -362,23 +368,6 @@ export const updateApplication = async (
     }
 
     // =====================
-    // UPDATE LAND
-    // =====================
-    await tx.land.update({
-      where: { id: application.land_id },
-      data: {
-        area_size: data.area_size,
-        street_address: data.street_address,
-        rt: data.rt,
-        rw: data.rw,
-        ward: data.ward,
-        subdistrict: data.subdistrict,
-        regency: data.regency,
-        province: data.province,
-      },
-    });
-
-    // =====================
     // UPDATE DOCUMENT
     // =====================
     if (files && Object.keys(files).length > 0) {
@@ -399,7 +388,7 @@ export const updateApplication = async (
             where: { id: existingDoc.id },
             data: {
               fileName: newFile.filename,
-              fileUrl: `uploads/${application.id}/${newFile.filename}`,
+              fileUrl: `uploads/applications/${application.id}/${newFile.filename}`,
               mimeType: newFile.mimetype,
               fileSize: newFile.size,
             },
@@ -410,7 +399,7 @@ export const updateApplication = async (
               application_id: applicationId,
               type: mappedType as DocumentType,
               fileName: newFile.filename,
-              fileUrl: `uploads/${application.id}/${newFile.filename}`,
+              fileUrl: `uploads/applications/${application.id}/${newFile.filename}`,
               mimeType: newFile.mimetype,
               fileSize: newFile.size,
             },

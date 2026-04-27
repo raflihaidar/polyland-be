@@ -6,28 +6,34 @@ import {
 } from "../types/domain/verificationAccount.type";
 import { VerificationStatus } from "../generated/prisma/client";
 
-export const isVerified = async (person_id : string) => {
+export const isVerified = async (person_id: string) => {
   try {
     const account = await prisma.accountVerification.findFirst({
-      where : {
-        person_id
-      }
-    })
+      where: {
+        person_id,
+      },
+    });
 
-    if(account) return account.status
+    if (account) return account.status;
 
-    return "not found"
-  } catch (err : any) {
-    throw new AppError("Gagal melakukan pengecekan verifikasi akun", 500, err.meta);
+    return "not found";
+  } catch (err: any) {
+    throw new AppError(
+      "Gagal melakukan pengecekan verifikasi akun",
+      500,
+      err.meta,
+    );
   }
-}
+};
 
 export const submit = async (data: VerificationAccountCreate) => {
   try {
-    const isExisting = await isVerified(data.person_id)
+    const isExisting = await isVerified(data.person_id);
 
-    if(isExisting === 'PENDING') throw new AppError("Akun anda sedang dalam proses verifikasi", 403)
-    if(isExisting === 'APPROVED') throw new AppError("Akun sudah terverifikasi", 403)
+    if (isExisting === "PENDING")
+      throw new AppError("Akun anda sedang dalam proses verifikasi", 403);
+    if (isExisting === "APPROVED")
+      throw new AppError("Akun sudah terverifikasi", 403);
 
     const verificationAccount = await prisma.accountVerification.create({
       data: {
@@ -58,16 +64,19 @@ export const verify = async (data: VerificationAccountUpdate) => {
       },
     });
 
-    const isApproved = verificationAccount.status === VerificationStatus.APPROVED
+    const isApproved =
+      verificationAccount.status === VerificationStatus.APPROVED;
     if (verificationAccount && isApproved) {
       return await prisma.$transaction(async (tx) => {
         const person = await tx.person.update({
           where: {
-            id: verificationAccount.person_id
+            id: verificationAccount.person_id,
           },
           data: {
             name: verificationAccount.fullName,
-            username : verificationAccount.fullName.toLowerCase().replace(/\s+/g, ''),
+            username: verificationAccount.fullName
+              .toLowerCase()
+              .replace(/\s+/g, ""),
             nik: verificationAccount.nik,
             phone: verificationAccount.phone,
             birthDate: verificationAccount.birthDate,
@@ -75,31 +84,32 @@ export const verify = async (data: VerificationAccountUpdate) => {
             gender: verificationAccount.gender,
             address: verificationAccount.address,
             isVerified: isApproved,
-            verifiedAt: verificationAccount.updatedAt
+            verifiedAt: verificationAccount.updatedAt,
           },
           include: {
-            roles: true
-          }
-        })
+            roles: true,
+          },
+        });
 
-        if(person.roles.some(role => role.role_id === 6)){
+        if (person.roles.some((role) => role.role_id === 6)) {
           await tx.rolePerson.update({
             where: {
               person_id_role_id: {
                 person_id: verificationAccount.person_id,
                 role_id: 6,
-              }
+              },
             },
             data: {
-              role_id: 5
-            }
-          })
+              role_id: 5,
+            },
+          });
         }
-      })
+      });
     }
 
     return verificationAccount;
   } catch (err: any) {
+    console.log(err);
     throw new AppError("Gagal melakukan verifikasi akun", 500, err.meta);
   }
 };
