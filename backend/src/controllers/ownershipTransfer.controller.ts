@@ -142,8 +142,6 @@ export const submitApplication = async (
 
     const { land_office_id, cert_code, cert_type, nib, land_id } = req.body;
 
-    console.log("owners : ", req.body.owners);
-
     const payload: ApplicationCreate = {
       person_id,
       land_office_id,
@@ -181,7 +179,10 @@ export const submitApplication = async (
           : [],
     };
 
-    const result = await ownershipService.submitApplication(payload);
+    const result = await ownershipService.submitApplication(
+      payload,
+      req.body._tempFolder,
+    );
 
     res.status(201).json({
       status: "success",

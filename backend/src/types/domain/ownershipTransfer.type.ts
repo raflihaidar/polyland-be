@@ -2,7 +2,7 @@ import { CertificateType } from "../../generated/prisma/enums";
 
 interface ApplicationOwnerInput {
   person_id: string;
-  sharePercent?: number;
+  share?: number;
 }
 
 interface PersonFile {

@@ -2,20 +2,24 @@ import * as VerifService from "../services/verificationAccount.service";
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/error";
 
-export const check = async (req : Request, res : Response, next : NextFunction) => {
+export const check = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-     const personId = req.person?.id as string
+    const personId = req.person?.id as string;
 
-     const isExisting = await VerifService.isVerified(personId)
+    const isExisting = await VerifService.isVerified(personId);
 
-     res.status(200).json({
-      message : "Berhasil melakukan pengecekan akun",
-      data : isExisting
-     })
+    res.status(200).json({
+      message: "Berhasil melakukan pengecekan akun",
+      data: isExisting,
+    });
   } catch (error) {
-    next()
+    next();
   }
-}
+};
 
 export const submit = async (
   req: Request,
@@ -23,17 +27,10 @@ export const submit = async (
   next: NextFunction,
 ) => {
   try {
-    const {
-      fullName,
-      nik,
-      phone,
-      birthPlace,
-      birthDate,
-      gender,
-      address,
-    } = req.body;
+    const { fullName, nik, phone, birthPlace, birthDate, gender, address } =
+      req.body;
 
-     const personId = req.person?.id as string
+    const personId = req.person?.id as string;
 
     if (
       !personId ||
@@ -49,7 +46,7 @@ export const submit = async (
     }
 
     const result = await VerifService.submit({
-      person_id : personId,
+      person_id: personId,
       fullName,
       nik,
       phone,
@@ -78,7 +75,7 @@ export const verify = async (
     const { id } = req.params;
 
     const result = await VerifService.verify({
-      id,
+      id: id as string,
       status,
       rejectionReason,
     });

@@ -40,5 +40,5 @@ export const contractConfig = {
 
 export const wsPublicClient = createPublicClient({
   chain: polygonAmoy,
-  transport: webSocket(WS_RPC_URL!)
-})
+  transport: webSocket(WS_RPC_URL!),
+});
