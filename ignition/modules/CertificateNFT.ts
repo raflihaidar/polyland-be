@@ -6,21 +6,7 @@ dotenv.config();
 export default buildModule("PolyLandModule", (m) => {
   const adminAddress = process.env.WALLET_ADDRESS!;
 
-  // 🔹 Deploy ApplicationPayment dulu
-  const pricePerSquareMeter = m.getParameter(
-    "pricePerSquareMeter",
-    "1000000000000000" // 0.001 ETH (contoh)
-  );
+  const certificate = m.contract("CertificateNFT", [adminAddress]);
 
-  const payment = m.contract("ApplicationPayment", [
-    pricePerSquareMeter,
-  ]);
-
-  // 🔹 Deploy CertificateNFT dengan alamat Payment
-  const certificate = m.contract("CertificateNFT", [
-    adminAddress,
-    payment,
-  ]);
-
-  return { payment, certificate };
+  return { certificate };
 });

@@ -80,3 +80,27 @@ export const getDetailCertificate = async (
     next(error);
   }
 };
+
+export const verifyCertificate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { tokenId } = req.params;
+
+    const result = await CertificateService.verifyCertificate(
+      tokenId as string,
+    );
+
+    res
+      .json({
+        status: "success",
+        message: "Berhasil melakukan verifikasi sertifikat",
+        data: result,
+      })
+      .status(200);
+  } catch (error) {
+    next();
+  }
+};

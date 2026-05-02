@@ -48,27 +48,23 @@ const pinata = new PinataSDK({
 // }
 
 // wsPublicClient.watchEvent({
-//   address: process.env.PAYMENT_CONTRACT_ADDRESS_V4 as `0x${string}`,
+//   address: process.env.CERTIFICATE_CONTRACT_ADDRESS as `0x${string}`,
 //   event: parseAbiItem(
-//     "event PaymentReceived(bytes32 indexed applicationId, bytes32 kantahCode, address indexed payer, uint256 amount)",
+//     "event CertificateMinted(uint256 indexed tokenId, address indexed recipient, string cid)"
 //   ),
 //   onLogs: async (logs) => {
 //     for (const log of logs) {
+//       const { tokenId, recipient, cid } = log.args;
 //       const txHash = log.transactionHash;
-//       const { applicationId, payer } = log.args;
 
-//       const decodedApplicationId = hexToString(applicationId!, {
-//         size: 32,
-//       }).replace(/\0/g, "");
+//       console.log(`Sertifikat berhasil di-mint!`);
+//       console.log(`Token ID: ${tokenId?.toString()}`);
+//       console.log(`Penerima: ${recipient}`);
+//       console.log(`Metadata CID: ${cid}`);
 
-//       const data = await updateApplicationStatus(
-//         decodedApplicationId,
-//         ApplicationStatus.PENANDATANGANAN,
-//       );
-
-//       if (data.status === ApplicationStatus.PENANDATANGANAN) {
-//         await generateCertificate(data?.file_number, txHash);
-//       }
+//       // Update status di database tradisional kamu
+//       // Gunakan tokenId ini untuk sinkronisasi data sertifikat
+//       await updateMintingStatus(tokenId!.toString(), txHash, cid);
 //     }
 //   },
 // });

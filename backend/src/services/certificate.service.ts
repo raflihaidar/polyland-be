@@ -10,7 +10,12 @@ import {
   formatDateIndonesia,
   imageToBase64,
 } from "../utils/parse";
-import { CertificateStatus } from "../generated/prisma/enums";
+import {
+  CertificateStatus,
+  MintingStatus,
+  PaymentStatus,
+} from "../generated/prisma/enums";
+import { parseEventLogs } from "viem";
 import QRCode from "qrcode";
 import crypto from "crypto";
 import CryptoJS from "crypto-js";
@@ -19,6 +24,7 @@ import { findHeadOfficeByLandOffice } from "./officer.service";
 import { toCapitalize } from "../utils/parse";
 import { encrypt } from "eciesjs";
 import { uploadFile } from "./pinata.service";
+import { walletClient, publicClient, contractConfig } from "../config/wallet";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -141,12 +147,24 @@ export const generateUniqueCode = (length = 6): string => {
   return result;
 };
 
-export const generateQRDoc = async (txHash: string) => {
-  const url = `${process.env.APP_URL}/verify/document/${txHash}`;
+export const generateQRDoc = async (docHash: string) => {
+  const url = `${process.env.APP_URL}/verify/${docHash}`;
 
-  const qrBase64 = await QRCode.toDataURL(url);
-
-  return qrBase64;
+  try {
+    const qrBase64 = await QRCode.toDataURL(url, {
+      errorCorrectionLevel: "H",
+      margin: 2,
+      scale: 4,
+      color: {
+        dark: "#000000",
+        light: "#ffffff",
+      },
+    });
+    return qrBase64;
+  } catch (err) {
+    console.error("Gagal generate QR:", err);
+    throw err;
+  }
 };
 
 export const generateQRSignature = async (
@@ -443,7 +461,7 @@ export const generateCertificate = async (
       .update(pdfBuffer)
       .digest("hex");
 
-    await createCertificate({
+    const certificate = await createCertificate({
       old_code: application.cert_code,
       nib,
       hash: documentHash,
@@ -456,6 +474,14 @@ export const generateCertificate = async (
       owners,
       cid: uploadRes?.cid || null,
     });
+
+    if (certificate) {
+      await mintingNft(
+        certificate.id,
+        application.person.wallet_address!,
+        certificate.cid!,
+      );
+    }
 
     return pdfBuffer;
   } catch (error) {
@@ -622,7 +648,169 @@ export const getCertificateById = async (
 
     return result;
   } catch (err: any) {
-    console.log(err);
     throw new AppError("Gagal mendapatkan sertifikat", 500, err.meta);
+  }
+};
+
+export const updatePaymentStatus = async (
+  application_id: string,
+  status: PaymentStatus,
+) => {
+  try {
+    if (!application_id || !status) {
+      throw new AppError("application_id dan status wajib diisi", 400);
+    }
+
+    const paymentStatus = await prisma.certificate.update({
+      where: { application_id },
+      data: { payment_status: status },
+      select: {
+        payment_status: true,
+      },
+    });
+
+    return paymentStatus;
+  } catch (err: any) {
+    if (err instanceof AppError) {
+      throw err;
+    }
+    throw new AppError(
+      "Gagal memperbarui status pembayaran sertifikat",
+      500,
+      err.meta,
+    );
+  }
+};
+
+export const mintingNft = async (
+  certificate_id: string,
+  userAddress: string,
+  cid: string,
+) => {
+  try {
+    await prisma.certificate.update({
+      where: { id: certificate_id },
+      data: { minting_status: MintingStatus.PROCESSING },
+    });
+
+    const hash = await walletClient.writeContract({
+      ...contractConfig,
+      functionName: "mintCertificate",
+      args: [userAddress, cid],
+    });
+
+    await prisma.certificate.update({
+      where: { id: certificate_id },
+      data: { tx_hash: hash },
+    });
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+    const logs = parseEventLogs({
+      abi: contractConfig.abi,
+      eventName: "CertificateMinted",
+      logs: receipt.logs,
+    });
+
+    if (logs.length === 0)
+      throw new Error("Event CertificateMinted tidak ditemukan");
+
+    const tokenId = (logs[0] as any).args.tokenId.toString();
+
+    await prisma.certificate.update({
+      where: { id: certificate_id },
+      data: {
+        minting_status: MintingStatus.SUCCESS,
+        token_id: tokenId,
+      },
+    });
+  } catch (err: any) {
+    console.log(err);
+    await prisma.certificate.update({
+      where: { id: certificate_id },
+      data: { minting_status: MintingStatus.FAILED },
+    });
+    throw new AppError("Proses Minting NFT Gagal", 500, err.meta);
+  }
+};
+
+export const verifyCertificate = async (tokenId: string) => {
+  try {
+    const id = Number(tokenId);
+
+    const isVerifiedOnChain = await publicClient.readContract({
+      ...contractConfig,
+      functionName: "isVerified",
+      args: [id],
+    });
+
+    if (!isVerifiedOnChain) {
+      return {
+        isVerified: false,
+        message:
+          "Dokumen tidak valid di Blockchain (Mungkin tidak ada atau sudah dicabut/revoked).",
+      };
+    }
+
+    const cid = await publicClient.readContract({
+      ...contractConfig,
+      functionName: "_certificateCID",
+      args: [id],
+    });
+
+    const certificateData = await prisma.certificate.findUnique({
+      where: { token_id: id },
+      include: {
+        owners: {
+          include: {
+            person: true,
+          },
+        },
+      },
+    });
+
+    if (!certificateData) {
+      return {
+        isVerified: false,
+        message:
+          "Aset ditemukan di blockchain, namun tidak terdaftar di database resmi BPN.",
+      };
+    }
+
+    const owners = certificateData.owners.map((owner, index) => ({
+      no: index + 1,
+      name: owner.person.name,
+      share: decimalToFraction(Number(owner.ownership_pct)),
+    }));
+
+    let ipfsAvailable = true;
+    try {
+      const res = await fetch(`https://ipfs.io/ipfs/${cid}`);
+
+      if (!res.ok) ipfsAvailable = false;
+    } catch {
+      ipfsAvailable = false;
+    }
+
+    return {
+      isVerified: isVerifiedOnChain,
+      status: ipfsAvailable ? "VALID" : "VALID_BUT_IPFS_UNAVAILABLE",
+      data: {
+        nib: certificateData.nib,
+        code: certificateData.code,
+        tokenId: certificateData.token_id,
+        status: certificateData.status,
+        txHash: certificateData.tx_hash,
+        owners,
+        createdAt: certificateData.createdAt,
+        verifiedAt: new Date().toISOString(),
+      },
+    };
+  } catch (err: any) {
+    console.error("Verification Error:", err);
+    return {
+      isVerified: false,
+      message: "Gagal memverifikasi dokumen. Token ID mungkin tidak terdaftar.",
+    };
   }
 };
