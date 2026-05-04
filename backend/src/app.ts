@@ -13,6 +13,7 @@ import mitraRouter from "./routes/mitra.route";
 import landOfficeRouter from "./routes/landOffice.route";
 import certificateRoute from "./routes/certificate.route";
 import officerRouter from "./routes/officer.route";
+import healthRouter from "./routes/health.route";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler";
 
@@ -35,6 +36,7 @@ app.use("/api/ownership-transfer", ownershipTFRouter);
 app.use("/api/land-office", landOfficeRouter);
 app.use("/api/certificate", certificateRoute);
 app.use("/api/officer", officerRouter);
+app.use("/api/health", healthRouter);
 
 app.use(errorHandler);
 
