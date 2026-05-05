@@ -70,6 +70,14 @@ enum MintingStatus {
   FAILED
 }
 
+enum QueueStatus {
+  MENUNGGU
+  DIPANGGIL
+  DILAYANI
+  SELESAI
+  TIDAK_HADIR
+}
+
 model Person {
   id             String  @id @default(uuid()) @db.Uuid
   wallet_address String? @unique @db.VarChar(50)
@@ -111,6 +119,7 @@ model Person {
   applicationOwners    ApplicationOwner[]
   headOfLandOffice     LandOffice?           @relation("HeadOffice")
   documentIdentity     ApplicationDocument[]
+  queueAttendees       QueueAttendee[]
 
   @@map("persons")
 }
@@ -170,6 +179,7 @@ model LandOffice {
   employees    Person[]
   applications Application[]
   price        LandOfficePrice?
+  queues       Queue[]
 
   @@map("land_offices")
 }
@@ -342,6 +352,7 @@ model Application {
   applicationDocuments ApplicationDocument[]
   owners               ApplicationOwner[]
   certificate          Certificate?
+  queue                Queue?
 
   @@map("applications")
 }
@@ -379,6 +390,38 @@ model ApplicationOwner {
   person      Person      @relation(fields: [person_id], references: [id])
 
   @@map("application_owners")
+}
+
+model Queue {
+  id             String      @id @default(uuid()) @db.Uuid
+  application_id String?     @unique @db.Uuid
+  land_office_id String      @db.Uuid
+  queue_number   Int
+  queue_date     DateTime    @db.Date
+  status         QueueStatus @default(MENUNGGU)
+  called_at      DateTime?
+  served_at      DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  application Application?    @relation(fields: [application_id], references: [id])
+  landOffice  LandOffice      @relation(fields: [land_office_id], references: [id])
+  attendees   QueueAttendee[]
+
+  @@unique([land_office_id, queue_date, queue_number])
+  @@map("queues")
+}
+
+model QueueAttendee {
+  id        String @id @default(uuid()) @db.Uuid
+  queue_id  String @db.Uuid
+  person_id String @db.Uuid
+
+  queue  Queue  @relation(fields: [queue_id], references: [id])
+  person Person @relation(fields: [person_id], references: [id])
+
+  @@unique([queue_id, person_id])
+  @@map("queue_attendees")
 }
 
 model FileCounter {

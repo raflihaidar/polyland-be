@@ -136,8 +136,6 @@ export const login = async (email: string) => {
 
     await redisClient.del(permissionKey);
 
-    console.log("ada permission : ", uniquePermissions.length > 0);
-
     // simpan permission sebagai Redis Set
     if (uniquePermissions.length > 0) {
       await redisClient.sAdd(permissionKey, uniquePermissions);
