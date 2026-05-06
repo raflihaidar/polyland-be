@@ -180,6 +180,7 @@ model LandOffice {
   applications Application[]
   price        LandOfficePrice?
   queues       Queue[]
+  loket        Loket[]
 
   @@map("land_offices")
 }
@@ -399,6 +400,10 @@ model Queue {
   queue_number   Int
   queue_date     DateTime    @db.Date
   status         QueueStatus @default(MENUNGGU)
+
+  loket_id     String
+  loket       Loket @relation(fields: [loket_id], references: [id])
+
   called_at      DateTime?
   served_at      DateTime?
   createdAt      DateTime    @default(now())
@@ -422,6 +427,18 @@ model QueueAttendee {
 
   @@unique([queue_id, person_id])
   @@map("queue_attendees")
+}
+
+model Loket {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  officeId    String
+  office      LandOffice @relation(fields: [officeId], references: [id])
+
+  queue    Queue[]
+
+  createdAt   DateTime @default(now())
 }
 
 model FileCounter {
