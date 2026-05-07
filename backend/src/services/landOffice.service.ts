@@ -1,5 +1,5 @@
 import { prisma } from "../config/prisma";
-import { Prisma } from "../generated/prisma/client";
+import { DayOfWeek, Prisma } from "../generated/prisma/client";
 import type {
   CreateLandOfficeInput,
   UpdateLandOfficeInput,
@@ -14,9 +14,8 @@ type GetLandOfficesParams = {
   search?: string;
 };
 
-
 export const createLandOffice = async (
-  data: CreateLandOfficeInput
+  data: CreateLandOfficeInput,
 ): Promise<LandOfficeResponse> => {
   try {
     const landOffice = await prisma.landOffice.create({
@@ -108,7 +107,7 @@ export const getLandOffices = async ({
 };
 
 export const getLandOfficeById = async (
-  id: string
+  id: string,
 ): Promise<LandOfficeResponse | null> => {
   try {
     const landOffice = await prisma.landOffice.findUnique({
@@ -117,7 +116,7 @@ export const getLandOfficeById = async (
       },
     });
 
-    if(!landOffice) new AppError("Kantor pertanahan tidak ditemukan", 404)
+    if (!landOffice) new AppError("Kantor pertanahan tidak ditemukan", 404);
 
     return landOffice;
   } catch (err: any) {
@@ -128,10 +127,9 @@ export const getLandOfficeById = async (
   }
 };
 
-
 export const updateLandOffice = async (
   id: string,
-  data: UpdateLandOfficeInput
+  data: UpdateLandOfficeInput,
 ): Promise<LandOfficeResponse> => {
   try {
     const existing = await prisma.landOffice.findUnique({
@@ -166,7 +164,7 @@ export const updateLandOffice = async (
 };
 
 export const deleteLandOffice = async (
-  id: string
+  id: string,
 ): Promise<LandOfficeResponse> => {
   try {
     const existing = await prisma.landOffice.findUnique({
@@ -190,5 +188,76 @@ export const deleteLandOffice = async (
     }
 
     throw new AppError("Gagal menghapus kantor pertanahan", 500, err.meta);
+  }
+};
+
+export const getOfficeStatus = async (office_id: string) => {
+  try {
+    const now = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }),
+    );
+
+    const dayIndex = now.getDay();
+
+    const dayMap = [
+      "SENIN",
+      "SELASA",
+      "RABU",
+      "KAMIS",
+      "JUMAT",
+      "SABTU",
+      "MINGGU",
+    ];
+
+    const today = dayMap[dayIndex - 1];
+
+    const currentTime = now.toTimeString().slice(0, 5);
+
+    const operational = await prisma.operationalHours.findUnique({
+      where: {
+        land_office_id_day: {
+          land_office_id: office_id,
+          day: today as DayOfWeek,
+        },
+      },
+    });
+
+    if (!operational) {
+      return {
+        is_open: false,
+        reason: "Tidak ada jadwal hari ini",
+      };
+    }
+
+    if (!operational.is_open) {
+      return {
+        is_open: false,
+        reason: "Hari libur",
+      };
+    }
+
+    if (currentTime < operational.opening_time) {
+      return {
+        is_open: false,
+        reason: "Belum buka",
+        open_at: operational.opening_time,
+      };
+    }
+
+    if (currentTime > operational.closing_time) {
+      return {
+        is_open: false,
+        reason: "Sudah tutup",
+        closed_at: operational.closing_time,
+      };
+    }
+
+    return {
+      is_open: true,
+      open_at: operational.opening_time,
+      close_at: operational.closing_time,
+    };
+  } catch (error) {
+    throw error;
   }
 };

@@ -7,7 +7,7 @@ import {
 import {
   generateNIB,
   generateUniqueCode,
-} from "../../services/document.service";
+} from "../../services/certificate.service";
 import "dotenv/config";
 
 export const landCertificateModule = async (prisma: PrismaClient) => {
@@ -79,6 +79,8 @@ export const landCertificateModule = async (prisma: PrismaClient) => {
       for (let i = 0; i < total; i++) {
         const v = villages[Math.floor(Math.random() * villages.length)];
 
+        console.log(v);
+
         await prisma.land.create({
           data: {
             area_size: randomArea(),
@@ -86,16 +88,16 @@ export const landCertificateModule = async (prisma: PrismaClient) => {
             rt: randomRT(),
             rw: randomRW(),
 
-            province_code: v.district.regency.province.code,
-            regency_code: v.district.regency.code,
-            district_code: v.district.code,
-            village_code: v.code,
+            province_code: Number(v.district.regency.province.code),
+            regency_code: Number(v.district.regency.code),
+            district_code: Number(v.district.code),
+            village_code: String(v.code),
 
             certificates: {
               create: {
                 nib: await generateNIB(
-                  v.district.regency.province.code,
-                  v.district.regency.code,
+                  Number(v.district.regency.province.code),
+                  Number(v.district.regency.code),
                   1,
                 ),
                 code: generateUniqueCode(6),
@@ -105,7 +107,7 @@ export const landCertificateModule = async (prisma: PrismaClient) => {
                 owners: {
                   create: {
                     person_id: PERSON_ID,
-                    ownership_pct: 100,
+                    ownership_pct: 1,
                   },
                 },
               },

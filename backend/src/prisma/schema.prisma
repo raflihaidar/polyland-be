@@ -78,6 +78,16 @@ enum QueueStatus {
   TIDAK_HADIR
 }
 
+enum DayOfWeek {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+  SABTU
+  MINGGU
+}
+
 model Person {
   id             String  @id @default(uuid()) @db.Uuid
   wallet_address String? @unique @db.VarChar(50)
@@ -119,7 +129,7 @@ model Person {
   applicationOwners    ApplicationOwner[]
   headOfLandOffice     LandOffice?           @relation("HeadOffice")
   documentIdentity     ApplicationDocument[]
-  queueAttendees       QueueAttendee[]
+  queues               Queue[]
 
   @@map("persons")
 }
@@ -134,14 +144,7 @@ model Land {
   province_code Int    @db.Integer
   regency_code  Int    @db.Integer
   district_code Int    @db.Integer
-  village_code  BigInt @db.BigInt
-
-  // north_boundary String? @db.VarChar(100)
-  // south_boundary String? @db.VarChar(100)
-  // west_boundary  String? @db.VarChar(100)
-  // east_boundary  String? @db.VarChar(100)
-  // latitude       String? @db.VarChar(100)
-  // longitude      String? @db.VarChar(100)
+  village_code  String @db.VarChar(255)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now())
@@ -174,15 +177,32 @@ model LandOffice {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  headOffice Person? @relation("HeadOffice", fields: [head_office_id], references: [id])
-
-  employees    Person[]
-  applications Application[]
-  price        LandOfficePrice?
-  queues       Queue[]
-  loket        Loket[]
+  headOffice       Person?            @relation("HeadOffice", fields: [head_office_id], references: [id])
+  employees        Person[]
+  applications     Application[]
+  price            LandOfficePrice?
+  loket            Loket[]
+  operationalHours OperationalHours[]
 
   @@map("land_offices")
+}
+
+model OperationalHours {
+  id             String    @id @default(uuid()) @db.Uuid
+  land_office_id String    @db.Uuid
+  day            DayOfWeek
+
+  is_open      Boolean @default(true)
+  opening_time String  @db.VarChar(5)
+  closing_time String  @db.VarChar(5)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  landOffice LandOffice @relation(fields: [land_office_id], references: [id])
+
+  @@unique([land_office_id, day])
+  @@map("operational_hours")
 }
 
 model LandOfficePrice {
@@ -243,7 +263,7 @@ model District {
 
 model Village {
   id            Int    @id @default(autoincrement())
-  code          BigInt @unique
+  code          String @unique @db.VarChar(255)
   district_code Int
 
   name String @db.VarChar(50)
@@ -353,7 +373,6 @@ model Application {
   applicationDocuments ApplicationDocument[]
   owners               ApplicationOwner[]
   certificate          Certificate?
-  queue                Queue?
 
   @@map("applications")
 }
@@ -393,52 +412,49 @@ model ApplicationOwner {
   @@map("application_owners")
 }
 
+/// Antrian per loket per hari.
+/// queue_number di-reset setiap hari, unik per (land_office_id, queue_date, queue_number).
+/// - Total Antrian  : COUNT WHERE loket_id = X AND queue_date = today
+/// - Sisa Antrian   : COUNT WHERE loket_id = X AND queue_date = today AND status = MENUNGGU
+/// - Antrian Saat Ini: WHERE loket_id = X AND queue_date = today AND status IN (DIPANGGIL, DILAYANI)
 model Queue {
-  id             String      @id @default(uuid()) @db.Uuid
-  application_id String?     @unique @db.Uuid
-  land_office_id String      @db.Uuid
-  queue_number   Int
-  queue_date     DateTime    @db.Date
-  status         QueueStatus @default(MENUNGGU)
+  id        String @id @default(uuid()) @db.Uuid
+  loket_id  String @db.Uuid
+  person_id String @db.Uuid
 
-  loket_id     String
-  loket       Loket @relation(fields: [loket_id], references: [id])
+  queue_number Int
+  queue_date   DateTime    @db.Date
+  status       QueueStatus @default(MENUNGGU)
 
-  called_at      DateTime?
-  served_at      DateTime?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  called_at DateTime?
+  served_at DateTime?
+  done_at   DateTime?
 
-  application Application?    @relation(fields: [application_id], references: [id])
-  landOffice  LandOffice      @relation(fields: [land_office_id], references: [id])
-  attendees   QueueAttendee[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([land_office_id, queue_date, queue_number])
+  loket  Loket  @relation(fields: [loket_id], references: [id])
+  person Person @relation(fields: [person_id], references: [id])
+
+  @@unique([loket_id, queue_date, queue_number])
+  @@index([loket_id, queue_date, status])
   @@map("queues")
 }
 
-model QueueAttendee {
-  id        String @id @default(uuid()) @db.Uuid
-  queue_id  String @db.Uuid
-  person_id String @db.Uuid
-
-  queue  Queue  @relation(fields: [queue_id], references: [id])
-  person Person @relation(fields: [person_id], references: [id])
-
-  @@unique([queue_id, person_id])
-  @@map("queue_attendees")
-}
-
 model Loket {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  officeId    String
-  office      LandOffice @relation(fields: [officeId], references: [id])
+  id          String     @id @default(uuid()) @db.Uuid
+  name        String     @db.VarChar(100)
+  description String?    @db.Text
+  is_active   Boolean    @default(true)
+  office_id   String     @db.Uuid
+  office      LandOffice @relation(fields: [office_id], references: [id])
 
-  queue    Queue[]
+  queue Queue[]
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lokets")
 }
 
 model FileCounter {
@@ -523,7 +539,6 @@ model AccountVerification {
   person_id String @db.Uuid
   person    Person @relation(fields: [person_id], references: [id])
 
-  // Draft data pengajuan
   fullName   String   @db.VarChar(150)
   nik        String   @db.VarChar(20)
   phone      String   @db.VarChar(20)
@@ -531,10 +546,6 @@ model AccountVerification {
   birthDate  DateTime
   gender     Gender
   address    String   @db.Text
-
-  // ktpPhotoUrl String
-  // selfiePhotoUrl String
-  // signatureUrl String
 
   status          VerificationStatus @default(PENDING)
   rejectionReason String?            @db.Text
