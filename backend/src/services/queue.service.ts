@@ -137,7 +137,6 @@ export async function createQueue(input: CreateQueueInput) {
   try {
     const { personId, loketId, date } = input;
     const now = new Date();
-    const today = todayDate();
 
     const loket = await prisma.loket.findUnique({
       where: { id: loketId },
@@ -152,7 +151,7 @@ export async function createQueue(input: CreateQueueInput) {
     const existingPersonQueue = await prisma.queue.findFirst({
       where: {
         loket_id: loketId,
-        queue_date: date ?? today,
+        queue_date: date,
         person_id: personId,
         status: {
           in: [
@@ -172,7 +171,7 @@ export async function createQueue(input: CreateQueueInput) {
 
     // 5. Create queue inside a transaction (safe queue_number generation)
     const queue = await prisma.$transaction(async (tx: any) => {
-      const queueNumber = await nextQueueNumber(tx, loketId, today);
+      const queueNumber = await nextQueueNumber(tx, loketId, date);
 
       return tx.queue.create({
         data: {
@@ -187,7 +186,7 @@ export async function createQueue(input: CreateQueueInput) {
             },
           },
           queue_number: queueNumber,
-          queue_date: today,
+          queue_date: date,
           status: QueueStatus.MENUNGGU,
         },
         include: {
@@ -224,32 +223,72 @@ export async function createQueue(input: CreateQueueInput) {
 // USER: Get My Queue Today
 // ─────────────────────────────────────────────
 
-/**
- * Retrieve the caller's active queue(s) today across all lokets.
- */
-export async function getMyQueues(personId: string) {
-  const today = todayDate();
+export const getMyQueues = async (
+  person_id: string,
+  date: Date | null = null,
+) => {
+  try {
+    const today = todayDate();
 
-  return prisma.queue.findMany({
-    where: {
-      queue_date: today,
-      application: { person_id: personId },
-    },
-    include: {
-      loket: {
-        select: {
-          id: true,
-          name: true,
-          office: { select: { id: true, name: true } },
+    return prisma.queue.findMany({
+      where: {
+        queue_date: date ?? today,
+        person_id,
+      },
+      select: {
+        id: true,
+        status: true,
+        queue_date: true,
+        queue_number: true,
+        loket_id: true,
+        loket: {
+          select: {
+            id: true,
+            name: true,
+            office: { select: { id: true, name: true, address: true } },
+          },
         },
       },
-      application: {
-        select: { id: true, file_number: true, status: true, type: true },
+      orderBy: { createdAt: "desc" },
+    });
+  } catch (error: any) {
+    throw new AppError(
+      "Terjadi kesalahan saat mengambil data antrian",
+      500,
+      error.meta,
+    );
+  }
+};
+
+export const getDetailQueue = async (person_id: string, queue_id: string) => {
+  try {
+    return prisma.queue.findFirst({
+      where: {
+        id: queue_id,
+        person_id,
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-}
+      select: {
+        id: true,
+        status: true,
+        queue_date: true,
+        queue_number: true,
+        createdAt: true,
+        called_at: true,
+        done_at: true,
+        served_at: true,
+        loket: {
+          select: {
+            id: true,
+            name: true,
+            office: { select: { id: true, name: true, address: true } },
+          },
+        },
+      },
+    });
+  } catch (error: any) {
+    throw new AppError("Gagal mendapatkan detail antrian", 500, error.meta);
+  }
+};
 
 // ─────────────────────────────────────────────
 // USER: Cancel My Queue
