@@ -70,13 +70,14 @@ async function assertOfficeIsOpen(
  */
 function todayDate(): Date {
   const d = new Date();
+
   d.setHours(0, 0, 0, 0);
+
   return d;
 }
 
 /**
- * Generate the next queue_number for a loket on a given date.
- * Uses a SELECT FOR UPDATE pattern via interactive transaction to avoid races.
+Generate nomor antrian pada saat membuat antrian
  */
 async function nextQueueNumber(
   tx: Omit<
@@ -116,7 +117,6 @@ export interface QueueSummary {
     id: string;
     queue_number: number;
     status: QueueStatus;
-    application_id: string | null;
   } | null;
 }
 
@@ -154,11 +154,7 @@ export async function createQueue(input: CreateQueueInput) {
         queue_date: date,
         person_id: personId,
         status: {
-          in: [
-            QueueStatus.MENUNGGU,
-            QueueStatus.DIPANGGIL,
-            QueueStatus.DILAYANI,
-          ],
+          in: [QueueStatus.MENUNGGU, QueueStatus.DIPANGGIL],
         },
       },
     });
@@ -226,30 +222,56 @@ export async function createQueue(input: CreateQueueInput) {
 export const getMyQueues = async (
   person_id: string,
   date: Date | null = null,
+  status: QueueStatus[] = [QueueStatus.MENUNGGU],
 ) => {
   try {
-    const today = todayDate();
+    let queueDateFilter = {};
+
+    if (date) {
+      const targetDate = date;
+
+      queueDateFilter = {
+        queue_date: targetDate,
+      };
+    }
 
     return prisma.queue.findMany({
       where: {
-        queue_date: date ?? today,
+        ...queueDateFilter,
+
         person_id,
+
+        status: {
+          in: status,
+        },
       },
+
       select: {
         id: true,
         status: true,
         queue_date: true,
         queue_number: true,
         loket_id: true,
+
         loket: {
           select: {
             id: true,
             name: true,
-            office: { select: { id: true, name: true, address: true } },
+
+            office: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+
+      orderBy: {
+        createdAt: "desc",
+      },
     });
   } catch (error: any) {
     throw new AppError(
@@ -356,13 +378,12 @@ export async function getQueueSummary(loketId: string): Promise<QueueSummary> {
       where: {
         loket_id: loketId,
         queue_date: today,
-        status: { in: [QueueStatus.DIPANGGIL, QueueStatus.DILAYANI] },
+        status: QueueStatus.DIPANGGIL,
       },
       select: {
         id: true,
         queue_number: true,
         status: true,
-        application_id: true,
       },
       orderBy: { queue_number: "asc" },
     }),
@@ -375,14 +396,114 @@ export async function getQueueSummary(loketId: string): Promise<QueueSummary> {
 // ADMIN: Get All Queues for a Loket (Today)
 // ─────────────────────────────────────────────
 
-export async function getLoketQueues(loketId: string, date?: Date) {
-  const targetDate = date ?? todayDate();
+export const getLoketQueues = async (
+  loketId: string,
+  date?: Date | null,
 
-  return prisma.queue.findMany({
-    where: { loket_id: loketId, queue_date: targetDate },
-    orderBy: { queue_number: "asc" },
-  });
-}
+  page: number = 1,
+  limit: number = 10,
+
+  search?: string,
+
+  status?: QueueStatus,
+) => {
+  try {
+    const targetDate = date ?? new Date();
+
+    const skip = (page - 1) * limit;
+
+    const whereClause = {
+      loket_id: loketId,
+
+      queue_date: targetDate,
+
+      ...(status && {
+        status,
+      }),
+
+      ...(search && {
+        OR: [
+          {
+            person: {
+              name: {
+                contains: search,
+                mode: "insensitive" as const,
+              },
+            },
+          },
+
+          ...(isNaN(Number(search))
+            ? []
+            : [
+                {
+                  queue_number: {
+                    equals: Number(search),
+                  },
+                },
+              ]),
+        ],
+      }),
+    };
+
+    // =====================================
+    // QUERY
+    // =====================================
+    const [queues, total] = await Promise.all([
+      prisma.queue.findMany({
+        where: whereClause,
+
+        orderBy: {
+          queue_number: "asc",
+        },
+
+        skip,
+        take: limit,
+
+        select: {
+          id: true,
+          queue_date: true,
+          queue_number: true,
+          status: true,
+
+          person: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      }),
+
+      prisma.queue.count({
+        where: whereClause,
+      }),
+    ]);
+
+    // =====================================
+    // RESPONSE
+    // =====================================
+    return {
+      data: queues,
+
+      pagination: {
+        total,
+        page,
+        limit,
+
+        totalPages: Math.ceil(total / limit),
+
+        hasNextPage: page < Math.ceil(total / limit),
+
+        hasPrevPage: page > 1,
+      },
+    };
+  } catch (error: any) {
+    throw new AppError(
+      "Terjadi kesalahan saat mengambil data antrian",
+      500,
+      error?.meta,
+    );
+  }
+};
 
 // ─────────────────────────────────────────────
 // ADMIN: Call Next Queue (MENUNGGU → DIPANGGIL)
@@ -392,11 +513,11 @@ export async function getLoketQueues(loketId: string, date?: Date) {
  * Mark the next MENUNGGU queue entry as DIPANGGIL.
  * If another entry is currently DIPANGGIL, it is bumped to TIDAK_HADIR first.
  */
-export async function callNextQueue(loketId: string) {
-  const today = todayDate();
+
+export const callNextQueue = async (loketId: string) => {
+  const today = new Date();
 
   return prisma.$transaction(async (tx: any) => {
-    // Expire any previously called-but-unserved entry
     await tx.queue.updateMany({
       where: {
         loket_id: loketId,
@@ -424,18 +545,9 @@ export async function callNextQueue(loketId: string) {
         status: QueueStatus.DIPANGGIL,
         called_at: new Date(),
       },
-      include: {
-        application: {
-          select: {
-            id: true,
-            file_number: true,
-            person: { select: { id: true, name: true, nik: true } },
-          },
-        },
-      },
     });
   });
-}
+};
 
 // ─────────────────────────────────────────────
 // ADMIN: Update Queue Status
@@ -445,76 +557,90 @@ export async function callNextQueue(loketId: string) {
  * Allowed officer transitions:
  *
  *   MENUNGGU   → DIPANGGIL  (use callNextQueue for ordered flow)
- *   DIPANGGIL  → DILAYANI   (officer starts serving)
+ *   DIPANGGIL  → SELESAI   (officer starts serving)
  *   DIPANGGIL  → TIDAK_HADIR (person didn't show up)
- *   DILAYANI   → SELESAI    (service completed)
- *   DILAYANI   → TIDAK_HADIR (edge case)
  */
 const ALLOWED_TRANSITIONS: Partial<Record<QueueStatus, QueueStatus[]>> = {
   [QueueStatus.MENUNGGU]: [QueueStatus.DIPANGGIL, QueueStatus.TIDAK_HADIR],
-  [QueueStatus.DIPANGGIL]: [QueueStatus.DILAYANI, QueueStatus.TIDAK_HADIR],
-  [QueueStatus.DILAYANI]: [QueueStatus.SELESAI, QueueStatus.TIDAK_HADIR],
+  [QueueStatus.DIPANGGIL]: [QueueStatus.SELESAI, QueueStatus.TIDAK_HADIR],
 };
 
-export async function updateQueueStatus(input: UpdateQueueStatusInput) {
-  const { queueId, status } = input;
+export const updateQueueStatus = async (input: UpdateQueueStatusInput) => {
+  try {
+    const { queueId, status } = input;
 
-  const queue = await prisma.queue.findUnique({ where: { id: queueId } });
-  if (!queue) throw new Error("Antrian tidak ditemukan.");
+    const queue = await prisma.queue.findUnique({ where: { id: queueId } });
+    if (!queue) throw new Error("Antrian tidak ditemukan.");
 
-  const allowed = ALLOWED_TRANSITIONS[queue.status] ?? [];
-  if (!allowed.includes(status)) {
-    throw new Error(
-      `Tidak dapat mengubah status dari "${queue.status}" ke "${status}".`,
+    const allowed = ALLOWED_TRANSITIONS[queue.status] ?? [];
+    if (!allowed.includes(status)) {
+      throw new AppError(
+        `Tidak dapat mengubah status dari "${queue.status}" ke "${status}".`,
+        400,
+      );
+    }
+
+    const timestampUpdates: Partial<{
+      called_at: Date;
+      served_at: Date;
+      done_at: Date;
+    }> = {};
+
+    if (status === QueueStatus.DIPANGGIL)
+      timestampUpdates.called_at = new Date();
+    if (status === QueueStatus.SELESAI) timestampUpdates.done_at = new Date();
+
+    return prisma.queue.update({
+      where: { id: queueId },
+      data: { status, ...timestampUpdates },
+      include: {
+        loket: { select: { id: true, name: true } },
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(
+      "Terjadi kesalahan saat update status antrian",
+      500,
+      error.meta,
     );
   }
-
-  const timestampUpdates: Partial<{
-    called_at: Date;
-    served_at: Date;
-    done_at: Date;
-  }> = {};
-
-  if (status === QueueStatus.DIPANGGIL) timestampUpdates.called_at = new Date();
-  if (status === QueueStatus.DILAYANI) timestampUpdates.served_at = new Date();
-  if (status === QueueStatus.SELESAI) timestampUpdates.done_at = new Date();
-
-  return prisma.queue.update({
-    where: { id: queueId },
-    data: { status, ...timestampUpdates },
-    include: {
-      application: {
-        select: {
-          id: true,
-          file_number: true,
-          person: { select: { id: true, name: true } },
-        },
-      },
-      loket: { select: { id: true, name: true } },
-    },
-  });
-}
+};
 
 // ─────────────────────────────────────────────
 // ADMIN: Reset Stale Queues (Cron / EOD Job)
 // ─────────────────────────────────────────────
 
-/**
- * Mark all MENUNGGU / DIPANGGIL / DILAYANI queues from past dates as TIDAK_HADIR.
- * Intended to be called by a daily cron job at end-of-day or start-of-next-day.
- */
-export async function expireOldQueues() {
-  const today = todayDate();
+// Update status antrian menjadi tidak hadir
+export const expireOldQueues = async () => {
+  try {
+    // const start = new Date();
+    // start.setHours(0, 0, 0, 0);
 
-  const result = await prisma.queue.updateMany({
-    where: {
-      queue_date: { lt: today },
-      status: {
-        in: [QueueStatus.MENUNGGU, QueueStatus.DIPANGGIL, QueueStatus.DILAYANI],
+    // const end = new Date();
+    // end.setHours(23, 59, 59, 999);
+
+    const today = new Date();
+
+    const result = await prisma.queue.updateMany({
+      where: {
+        queue_date: today,
+        status: {
+          in: [QueueStatus.MENUNGGU, QueueStatus.DIPANGGIL],
+        },
       },
-    },
-    data: { status: QueueStatus.TIDAK_HADIR },
-  });
+      data: { status: QueueStatus.TIDAK_HADIR },
+    });
 
-  return result;
-}
+    return result;
+  } catch (error: any) {
+    throw new AppError(
+      "Terjadi kesalahan saat updated antrian",
+      500,
+      error?.meta,
+    );
+  }
+};

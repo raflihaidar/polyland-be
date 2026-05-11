@@ -4,10 +4,10 @@ import { AppError } from "../utils/error";
 export const getLoket = async (office_id: string) => {
   try {
     const start = new Date();
-    start.setHours(0, 0, 0, 0);
+    start.setUTCHours(0, 0, 0, 0);
 
     const end = new Date();
-    end.setHours(23, 59, 59, 999);
+    end.setUTCHours(23, 59, 59, 999);
 
     const lokets = await prisma.loket.findMany({
       where: {

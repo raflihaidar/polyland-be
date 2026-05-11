@@ -2,10 +2,12 @@ import express from "express";
 import "dotenv/config";
 import { PinataSDK } from "pinata";
 import cors from "cors";
+import cron from "node-cron";
 // import { parseAbiItem, hexToString } from "viem";
 // import { wsPublicClient } from "./config/wallet";
 // import { updateApplicationStatus } from "./services/ownershipTransfer.service";
 // import { ApplicationStatus } from "../src/generated/prisma/enums";
+import * as QueueService from "./services/queue.service";
 import authRouter from "./routes/auth.route";
 import verifAccountRouter from "./routes/verificationAccount.route";
 import ownershipTFRouter from "./routes/ownershipTransfer.route";
@@ -120,5 +122,15 @@ app.get("/file/:cid", async (req, res) => {
 //       message: "Upload to IPFS successfully",
 //     });
 // });
+
+cron.schedule(
+  "0 0 * * *",
+  () => {
+    QueueService.expireOldQueues();
+  },
+  {
+    timezone: "Asia/Jakarta",
+  },
+);
 
 app.listen(port, () => console.log(`Server running on port ${port}`));

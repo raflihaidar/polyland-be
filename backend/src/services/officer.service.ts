@@ -98,7 +98,7 @@ export const createHeadOfficer = async (payload: OfficerCreate) => {
 
         await prisma.rolePerson.create({
           data : {
-            role_id : 4,
+            role_id : 2,
             person_id : headOfficer.id
           }
         })

@@ -73,7 +73,7 @@ enum MintingStatus {
 enum QueueStatus {
   MENUNGGU
   DIPANGGIL
-  DILAYANI
+  // DILAYANI
   SELESAI
   TIDAK_HADIR
 }

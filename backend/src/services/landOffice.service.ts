@@ -200,16 +200,16 @@ export const getOfficeStatus = async (office_id: string) => {
     const dayIndex = now.getDay();
 
     const dayMap = [
+      "MINGGU",
       "SENIN",
       "SELASA",
       "RABU",
       "KAMIS",
       "JUMAT",
       "SABTU",
-      "MINGGU",
     ];
 
-    const today = dayMap[dayIndex - 1];
+    const today = dayMap[dayIndex];
 
     const currentTime = now.toTimeString().slice(0, 5);
 

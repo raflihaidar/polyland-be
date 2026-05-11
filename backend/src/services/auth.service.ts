@@ -172,8 +172,25 @@ export const getUser = async (id: string) => {
             role: { select: { name: true } },
           },
         },
+        land_office_id: true,
       },
     });
+
+    const adminRoles = [
+      "admin kantah",
+      "kepala kantah",
+      "registration officer",
+      "notaris/PPAT",
+    ];
+
+    const isAdmin = person?.roles.some((rp) =>
+      adminRoles.includes(rp.role.name),
+    );
+
+    if (!isAdmin) {
+      // @ts-ignore (jika TS komplain karena land_office_id bersifat mandatory di interface)
+      delete (person as any).land_office_id;
+    }
 
     if (!person) {
       throw new AppError("Data user tidak ditemukan", 400);
