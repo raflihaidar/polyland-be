@@ -5,11 +5,7 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import {
-  decimalToFraction,
-  formatDateIndonesia,
-  imageToBase64,
-} from "../utils/parse";
+import { formatDateIndonesia, imageToBase64 } from "../utils/parse";
 import {
   CertificateStatus,
   MintingStatus,
@@ -28,6 +24,63 @@ import { walletClient, publicClient, contractConfig } from "../config/wallet";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+export const searchCertificate = async (search: string) => {
+  try {
+    const certificates = await prisma.certificate.findMany({
+      where: {
+        OR: [
+          {
+            nib: search,
+          },
+          {
+            cid: search,
+          },
+        ],
+      },
+      select: {
+        id: true,
+        nib: true,
+        type: true,
+        status: true,
+        code: true,
+        land: {
+          select: {
+            id: true,
+            area_size: true,
+            street_address: true,
+            rt: true,
+            rw: true,
+            province: {
+              select: {
+                name: true,
+              },
+            },
+            regency: {
+              select: {
+                name: true,
+              },
+            },
+            district: {
+              select: {
+                name: true,
+              },
+            },
+            village: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return certificates;
+  } catch (error: any) {
+    throw new AppError("Terjadi kesalahan saat mencari data", 500, error?.meta);
+  }
+};
 
 export const encryptFile = (buffer: Buffer) => {
   const aesKey = crypto.randomBytes(32);
@@ -147,8 +200,8 @@ export const generateUniqueCode = (length = 6): string => {
   return result;
 };
 
-export const generateQRDoc = async (docHash: string) => {
-  const url = `${process.env.APP_URL}/verify/${docHash}`;
+export const generateQRDoc = async (tokenId: string | number) => {
+  const url = `${process.env.FE_URL}/verify/certificate/${tokenId}`;
 
   try {
     const qrBase64 = await QRCode.toDataURL(url, {
@@ -384,7 +437,7 @@ export const generateCertificate = async (
     name: owner.person.name,
     birthPlace: owner.person.birthPlace,
     birthDate: formatDateIndonesia(owner.person.birthDate!),
-    share: decimalToFraction(Number(owner.share)),
+    share: owner.share,
   }));
 
   const noteList = notes.map((n, index) => ({
@@ -393,6 +446,40 @@ export const generateCertificate = async (
   }));
 
   try {
+    // ─── 1. Buat certificate record dulu (tanpa CID) ───────────────────────
+    const documentHash = "pending"; // placeholder, akan diupdate setelah PDF final
+
+    const certificate = await createCertificate({
+      old_code: application.cert_code,
+      nib,
+      hash: documentHash,
+      code,
+      land_id: application.land_id,
+      status: CertificateStatus.AKTIF,
+      type: application.type,
+      application_id: application.id,
+      notes,
+      owners,
+    });
+
+    if (!certificate) {
+      throw new AppError(
+        "Sertifikat tanah gagal dibuat, silahkan periksa data",
+        400,
+      );
+    }
+
+    // ─── 2. Mint NFT untuk mendapatkan tokenId ─────────────────────────────
+    const tokenId = await mintingNft(
+      certificate.id,
+      application.person.wallet_address!,
+    );
+
+    // ─── 3. Generate HTML dengan qr_doc yang sudah ada tokenId ─────────────
+    // const qrDocUrl = `${process.env.FE_URL}?tokenId=${tokenId}`;
+
+    const qrDocBase64 = await generateQRDoc(tokenId);
+
     const html = template({
       garuda_path: garudaImage,
       code,
@@ -410,10 +497,13 @@ export const generateCertificate = async (
       nib,
       notes: noteList,
       qr_ttd: qr_signature,
+      qr_doc: qrDocBase64,
     });
 
+    // ─── 4. Generate PDF ────────────────────────────────────────────────────
     const pdfBuffer = await generatePDF(html);
 
+    // ─── 5. Enkripsi PDF ────────────────────────────────────────────────────
     const { encryptedBuffer, aesKey, iv, authTag } = encryptFile(
       Buffer.from(pdfBuffer),
     );
@@ -427,11 +517,7 @@ export const generateCertificate = async (
         );
       }
 
-      // Memanggil fungsi yang kita buat sebelumnya
-      const wrapped = encryptAESKey(
-        aesKey, // Kunci AES mentah
-        userPubKey, // Public Key user (Base64)
-      );
+      const wrapped = encryptAESKey(aesKey, userPubKey);
 
       return {
         walletAddress: owner.person.wallet_address,
@@ -450,38 +536,30 @@ export const generateCertificate = async (
       },
     };
 
+    // ─── 6. Upload ke IPFS ──────────────────────────────────────────────────
     const uploadRes = await uploadFile(
       encryptedBuffer,
       `${code}.pdf`,
       metadata,
     );
 
-    const documentHash = crypto
+    if (uploadRes?.cid) {
+      await setCertificateCID(tokenId, uploadRes?.cid);
+    }
+
+    // ─── 7. Update certificate dengan hash & CID yang final ────────────────
+    const finalDocumentHash = crypto
       .createHash("sha256")
       .update(pdfBuffer)
       .digest("hex");
 
-    const certificate = await createCertificate({
-      old_code: application.cert_code,
-      nib,
-      hash: documentHash,
-      code,
-      land_id: application.land_id,
-      status: CertificateStatus.AKTIF,
-      type: application.type,
-      application_id: application.id,
-      notes,
-      owners,
-      cid: uploadRes?.cid || null,
+    await prisma.certificate.update({
+      where: { id: certificate.id },
+      data: {
+        hash: finalDocumentHash,
+        cid: uploadRes?.cid || null,
+      },
     });
-
-    if (certificate) {
-      await mintingNft(
-        certificate.id,
-        application.person.wallet_address!,
-        certificate.cid!,
-      );
-    }
 
     return pdfBuffer;
   } catch (error) {
@@ -518,6 +596,7 @@ export const getCertificates = async (person_id: string) => {
         nib: true,
         type: true,
         status: true,
+        label: true,
         land: {
           select: {
             province: {
@@ -555,6 +634,7 @@ export const getCertificates = async (person_id: string) => {
         code: item.code,
         type: item.type,
         status: item.status,
+        label : item.label,
         address: {
           province: item.land.province.name,
           regency: item.land.regency.name,
@@ -685,7 +765,6 @@ export const updatePaymentStatus = async (
 export const mintingNft = async (
   certificate_id: string,
   userAddress: string,
-  cid: string,
 ) => {
   try {
     await prisma.certificate.update({
@@ -696,7 +775,7 @@ export const mintingNft = async (
     const hash = await walletClient.writeContract({
       ...contractConfig,
       functionName: "mintCertificate",
-      args: [userAddress, cid],
+      args: [userAddress],
     });
 
     await prisma.certificate.update({
@@ -721,9 +800,11 @@ export const mintingNft = async (
       where: { id: certificate_id },
       data: {
         minting_status: MintingStatus.SUCCESS,
-        token_id: tokenId,
+        token_id: Number(tokenId),
       },
     });
+
+    return Number(tokenId);
   } catch (err: any) {
     console.log(err);
     await prisma.certificate.update({
@@ -734,83 +815,166 @@ export const mintingNft = async (
   }
 };
 
-export const verifyCertificate = async (tokenId: string) => {
+export const setCertificateCID = async (tokenId: number, cid: string) => {
   try {
-    const id = Number(tokenId);
+    if (!cid) {
+      throw new Error("CID tidak boleh kosong");
+    }
 
-    const isVerifiedOnChain = await publicClient.readContract({
+    console.log("[NFT] Set CID dimulai:", { tokenId, cid });
+
+    const txHash = await walletClient.writeContract({
+      ...contractConfig,
+      functionName: "setCertificateCID",
+      args: [BigInt(tokenId), cid],
+      account: walletClient.account,
+    });
+
+    console.log("[NFT] Transaction sent:", txHash);
+
+    // optional: wait for confirmation
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash: txHash,
+    });
+
+    console.log("[NFT] Transaction confirmed:", {
+      txHash,
+      blockNumber: receipt.blockNumber,
+    });
+
+    return {
+      txHash,
+      receipt,
+    };
+  } catch (error) {
+    console.error("[NFT] Failed setCertificateCID:", {
+      tokenId,
+      cid,
+      error,
+    });
+
+    throw new Error("Gagal update CID ke smart contract");
+  }
+};
+
+export const setCertificateCIDWithRetry = async (
+  tokenId: number,
+  cid: string,
+  retry = 3,
+) => {
+  let lastError: any;
+
+  for (let i = 1; i <= retry; i++) {
+    try {
+      console.log(`[NFT] Attempt ${i} setCID`);
+
+      const result = await setCertificateCID(tokenId, cid);
+
+      return result;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[NFT] Retry ${i} gagal`, err);
+
+      await new Promise((r) => setTimeout(r, 1000 * i));
+    }
+  }
+
+  throw new Error("Gagal set CID setelah retry", { cause: lastError });
+};
+
+export const verifyCertificate = async (tokenId: number) => {
+  // ─── 1. Call smart contract isVerified ────────────────────────────────
+  let isVerified: boolean;
+
+  try {
+    // const contract = getContract();
+    // isVerified = await contract.isVerified(tokenId);
+
+    isVerified = (await publicClient.readContract({
       ...contractConfig,
       functionName: "isVerified",
-      args: [id],
-    });
+      args: [BigInt(tokenId)],
+    })) as boolean;
+  } catch (error) {
+    throw new AppError("Gagal melakukan verifikasi ke blockchain", 502);
+  }
 
-    if (!isVerifiedOnChain) {
-      return {
-        isVerified: false,
-        message:
-          "Dokumen tidak valid di Blockchain (Mungkin tidak ada atau sudah dicabut/revoked).",
-      };
-    }
+  if (!isVerified) {
+    throw new AppError("Sertifikat tidak valid atau telah dicabut", 403);
+  }
 
-    const cid = await publicClient.readContract({
-      ...contractConfig,
-      functionName: "_certificateCID",
-      args: [id],
-    });
-
-    const certificateData = await prisma.certificate.findUnique({
-      where: { token_id: id },
-      include: {
-        owners: {
-          include: {
-            person: true,
-          },
+  // ─── 2. Ambil data sertifikat dari DB ──────────────────────────────────
+  const certificate = await prisma.certificate.findUnique({
+    where: { token_id: tokenId },
+    include: {
+      land: {
+        include: {
+          province: true,
+          regency: true,
+          district: true,
+          village: true,
         },
       },
+      owners: {
+        include: {
+          person: true,
+        },
+      },
+      notes: {
+        orderBy: { created_at: "asc" },
+      },
+    },
+  });
+
+  if (!certificate) {
+    throw new AppError("Data sertifikat tidak ditemukan", 404);
+  }
+
+  // ─── 3. Susun response ─────────────────────────────────────────────────
+  return {
+    isVerified: true,
+    certificate: {
+      id: certificate.id,
+      code: certificate.code,
+      nib: certificate.nib,
+      type: certificate.type,
+      status: certificate.status,
+      token_id: certificate.token_id,
+      tx_hash: certificate.tx_hash,
+      hash: certificate.hash,
+      cid: certificate.cid,
+      createdAt: certificate.createdAt,
+      land: {
+        area_size: certificate.land.area_size,
+        street_address: certificate.land.street_address,
+        village: certificate.land.village.name,
+        district: certificate.land.district.name,
+        regency: certificate.land.regency.name,
+        province: certificate.land.province.name,
+      },
+      owners: certificate.owners.map((o) => ({
+        name: o.person.name,
+        nik: o.person.nik,
+        share: o.ownership_pct,
+      })),
+      notes: certificate.notes.map((n) => n.note),
+    },
+  };
+};
+
+export const updateLabelCertificate = async (id: string, label: string) => {
+  try {
+    const certificate = await prisma.certificate.update({
+      where: {
+        id,
+      },
+      data: {
+        label: label,
+      },
     });
 
-    if (!certificateData) {
-      return {
-        isVerified: false,
-        message:
-          "Aset ditemukan di blockchain, namun tidak terdaftar di database resmi BPN.",
-      };
-    }
-
-    const owners = certificateData.owners.map((owner, index) => ({
-      no: index + 1,
-      name: owner.person.name,
-      share: decimalToFraction(Number(owner.ownership_pct)),
-    }));
-
-    let ipfsAvailable = true;
-    try {
-      const res = await fetch(`https://ipfs.io/ipfs/${cid}`);
-
-      if (!res.ok) ipfsAvailable = false;
-    } catch {
-      ipfsAvailable = false;
-    }
-
-    return {
-      isVerified: isVerifiedOnChain,
-      status: ipfsAvailable ? "VALID" : "VALID_BUT_IPFS_UNAVAILABLE",
-      data: {
-        nib: certificateData.nib,
-        code: certificateData.code,
-        tokenId: certificateData.token_id,
-        status: certificateData.status,
-        txHash: certificateData.tx_hash,
-        owners,
-        createdAt: certificateData.createdAt,
-        verifiedAt: new Date().toISOString(),
-      },
-    };
-  } catch (err: any) {
-    console.error("Verification Error:", err);
-    return {
-      isVerified: false,
-      message: "Gagal memverifikasi dokumen. Token ID mungkin tidak terdaftar.",
-    };
+    return certificate;
+  } catch (error: any) {
+    throw new AppError("Update data sertifikat gagal", 500, error?.meta);
   }
 };

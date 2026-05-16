@@ -17,9 +17,15 @@ import certificateRoute from "./routes/certificate.route";
 import officerRouter from "./routes/officer.route";
 import loketRouter from "./routes/loket.route";
 import queueRouter from "./routes/queue.route";
+import personRouter from "./routes/person.route";
 import healthRouter from "./routes/health.route";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.APP_PORT || 8000;
@@ -34,6 +40,7 @@ app.use(
 );
 
 app.use("/api/auth", authRouter);
+app.use("/api/person", personRouter);
 app.use("/api/mitra", mitraRouter);
 app.use("/api/verification-account", verifAccountRouter);
 app.use("/api/ownership-transfer", ownershipTFRouter);
@@ -43,6 +50,7 @@ app.use("/api/officer", officerRouter);
 app.use("/api/loket", loketRouter);
 app.use("/api/queue", queueRouter);
 app.use("/api/health", healthRouter);
+app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
 
 app.use(errorHandler);
 

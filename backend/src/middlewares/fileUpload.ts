@@ -32,7 +32,18 @@ export const uploadUpdate = (applicationId: string) =>
   multer({
     storage: multer.diskStorage({
       destination: function (req, file, cb) {
-        const uploadPath = path.join(baseUploadDir, applicationId);
+        if (!req.body._tempFolder) {
+          req.body._tempFolder = Date.now().toString();
+        }
+
+        const uploadPath = path.join(
+          baseUploadDir,
+          "temp",
+          req.body._tempFolder,
+        );
+        // const uploadPath = path.join(baseUploadDir, applicationId);
+
+        // console.log("uploadPath : ", uploadPath);
 
         if (!fs.existsSync(uploadPath)) {
           fs.mkdirSync(uploadPath, { recursive: true });

@@ -15,7 +15,6 @@ enum CertificateStatus {
 }
 
 enum ApplicationStatus {
-  DIPROSES
   VERIFIKASI_BERKAS
   MENUNGGU_PEMBAYARAN
   PENANDATANGANAN
@@ -94,7 +93,7 @@ model Person {
 
   land_office_id String? @db.Uuid
 
-  name       String?   @db.VarChar(150)
+  name       String?   @unique @db.VarChar(150)
   nik        String?   @unique @db.VarChar(20)
   phone      String?   @db.VarChar(20)
   birthPlace String?   @db.VarChar(100)
@@ -281,9 +280,10 @@ model Certificate {
   nib            String            @db.VarChar(100)
   code           String            @unique @db.VarChar(100)
   land_id        String            @db.Uuid
-  cid            String?           @db.VarChar(255)
+  cid            String?           @unique @db.VarChar(255)
   status         CertificateStatus @default(AKTIF)
   type           CertificateType
+  label          String?           @db.VarChar(100)
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @default(now())
   hash           String?           @db.VarChar(255)
@@ -350,12 +350,12 @@ model Application {
   land_office_id String  @db.Uuid
   officer_id     String? @db.Uuid
 
-  status ApplicationStatus @default(DIPROSES)
+  status ApplicationStatus @default(VERIFIKASI_BERKAS)
   type   CertificateType
-  nib    String            @unique @db.VarChar(100)
+  nib    String            @db.VarChar(100)
 
   file_number       String @unique @db.VarChar(100)
-  cert_code         String @unique @db.VarChar(100)
+  cert_code         String @db.VarChar(100)
   land_price_per_m2 Int    @db.Integer
   registration_fee  Int    @db.Integer
   total_fee         BigInt @default(0)
@@ -366,13 +366,13 @@ model Application {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @default(now())
 
-  land                 Land                  @relation(fields: [land_id], references: [id])
-  person               Person                @relation(fields: [person_id], references: [id])
-  landOffice           LandOffice            @relation(fields: [land_office_id], references: [id])
-  officer              Person?               @relation("ApplicationOfficer", fields: [officer_id], references: [id])
-  applicationDocuments ApplicationDocument[]
-  owners               ApplicationOwner[]
-  certificate          Certificate?
+  land        Land                  @relation(fields: [land_id], references: [id])
+  person      Person                @relation(fields: [person_id], references: [id])
+  landOffice  LandOffice            @relation(fields: [land_office_id], references: [id])
+  officer     Person?               @relation("ApplicationOfficer", fields: [officer_id], references: [id])
+  document    ApplicationDocument[]
+  owners      ApplicationOwner[]
+  certificate Certificate?
 
   @@map("applications")
 }
@@ -395,6 +395,7 @@ model ApplicationDocument {
   application Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
   person      Person?     @relation(fields: [person_id], references: [id])
 
+  @@unique([application_id, person_id, type])
   @@map("application_documents")
 }
 
@@ -409,14 +410,10 @@ model ApplicationOwner {
   application Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
   person      Person      @relation(fields: [person_id], references: [id])
 
+  @@unique([application_id, person_id])
   @@map("application_owners")
 }
 
-/// Antrian per loket per hari.
-/// queue_number di-reset setiap hari, unik per (land_office_id, queue_date, queue_number).
-/// - Total Antrian  : COUNT WHERE loket_id = X AND queue_date = today
-/// - Sisa Antrian   : COUNT WHERE loket_id = X AND queue_date = today AND status = MENUNGGU
-/// - Antrian Saat Ini: WHERE loket_id = X AND queue_date = today AND status IN (DIPANGGIL, DILAYANI)
 model Queue {
   id        String @id @default(uuid()) @db.Uuid
   loket_id  String @db.Uuid
@@ -549,6 +546,9 @@ model AccountVerification {
 
   status          VerificationStatus @default(PENDING)
   rejectionReason String?            @db.Text
+  publicKey       String?            @db.Text
+  privateKey      String?            @db.Text
+  wallet_address  String?            @unique @db.VarChar(50)
 
   verifiedBy String? @db.Uuid
   verifier   Person? @relation("VerificationApprover", fields: [verifiedBy], references: [id])

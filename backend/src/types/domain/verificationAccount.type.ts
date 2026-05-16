@@ -9,6 +9,8 @@ export interface VerificationAccountCreate {
   birthDate: Date;
   gender: Gender;
   address: string;
+  publicKey: string;
+  wallet_address: string;
 }
 
 export interface VerificationAccountUpdate {

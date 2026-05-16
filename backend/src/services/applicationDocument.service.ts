@@ -27,6 +27,7 @@ export const mapApplicationDocuments = (applicationId: string, data: any) => {
 
       docs.push({
         application_id: applicationId,
+        person_id: item.person_id,
         type,
         fileUrl: `${baseFolder}/${path.basename(item.file.path)}`,
         fileName: item.file.originalname,

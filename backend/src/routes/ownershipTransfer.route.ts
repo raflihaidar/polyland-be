@@ -6,6 +6,7 @@ import {
   submitApplication,
   updateApplicationStatus,
   updateApplication,
+  verifyPayment,
 } from "../controllers/ownershipTransfer.controller";
 import { authentication } from "../middlewares/authentication";
 import { authorize } from "../middlewares/authorization";
@@ -39,6 +40,7 @@ router.post(
   ]),
   submitApplication,
 );
+router.put("/verify/payment/:id", verifyPayment);
 router.put(
   "/status",
   authorize("peralihan-hak", "update"),
@@ -50,13 +52,15 @@ router.put(
   (req, res, next) => {
     const upload = uploadUpdate(req.params.id as string).fields([
       { name: "cert_file", maxCount: 1 },
-      { name: "ktp_penjual", maxCount: 1 },
-      { name: "kk_pembeli", maxCount: 1 },
-      { name: "ktp_pembeli", maxCount: 1 },
       { name: "akta_jual_beli", maxCount: 1 },
       { name: "fc_sppt", maxCount: 1 },
       { name: "fc_pbb", maxCount: 1 },
       { name: "ssb", maxCount: 1 },
+
+      // array files
+      { name: "ktp_pembeli", maxCount: 10 },
+      { name: "ktp_penjual", maxCount: 10 },
+      { name: "kk_pembeli", maxCount: 10 },
     ]);
 
     upload(req, res, function (err) {

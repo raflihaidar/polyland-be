@@ -45,6 +45,7 @@ export const submit = async (data: VerificationAccountCreate) => {
 
     return verificationAccount;
   } catch (err: any) {
+    console.log(err);
     if (err instanceof AppError) {
       throw err;
     }
@@ -85,6 +86,8 @@ export const verify = async (data: VerificationAccountUpdate) => {
             address: verificationAccount.address,
             isVerified: isApproved,
             verifiedAt: verificationAccount.updatedAt,
+            publicKey: verificationAccount.publicKey,
+            wallet_address: verificationAccount.wallet_address,
           },
           include: {
             roles: true,

@@ -2,6 +2,28 @@ import * as CertificateService from "../services/certificate.service";
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/error";
 
+export const searchCertificate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { q } = req.query;
+
+    const queue = await CertificateService.searchCertificate(q as string);
+
+    res
+      .json({
+        status: "success",
+        message: "Berhasil mendapatkan data sertifikat",
+        data: queue,
+      })
+      .status(200);
+  } catch (error: unknown) {
+    next(error);
+  }
+};
+
 export const generateCertificate = async (
   req: Request,
   res: Response,
@@ -87,20 +109,57 @@ export const verifyCertificate = async (
   next: NextFunction,
 ) => {
   try {
-    const { tokenId } = req.params;
+    const tokenId = parseInt(req.params.tokenId as string);
 
-    const result = await CertificateService.verifyCertificate(
-      tokenId as string,
-    );
+    if (isNaN(tokenId)) {
+      return res.status(400).json({
+        success: false,
+        message: "tokenId tidak valid",
+      });
+    }
 
-    res
-      .json({
-        status: "success",
-        message: "Berhasil melakukan verifikasi sertifikat",
-        data: result,
-      })
-      .status(200);
+    const result = await CertificateService.verifyCertificate(tokenId);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
   } catch (error) {
-    next();
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Terjadi kesalahan server",
+    });
+  }
+};
+
+export const updateLabelCertificate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { label } = req.body;
+
+    if (!id) throw new AppError("Id Certificate Tidak ditemukan", 400);
+
+    const certificate = await CertificateService.updateLabelCertificate(
+      id as string,
+      label,
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Berhasil update data sertifikat",
+      data: certificate,
+    });
+  } catch (error: any) {
+    next(error);
   }
 };

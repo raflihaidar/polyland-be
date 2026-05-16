@@ -194,29 +194,16 @@
         "type": "uint256"
       },
       {
-        "indexed": false,
-        "internalType": "string",
-        "name": "cid",
-        "type": "string"
-      }
-    ],
-    "name": "CertificateCIDSet",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "tokenId",
-        "type": "uint256"
-      },
-      {
         "indexed": true,
         "internalType": "address",
         "name": "recipient",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "cid",
+        "type": "string"
       }
     ],
     "name": "CertificateMinted",
@@ -602,6 +589,11 @@
         "internalType": "address",
         "name": "recipient",
         "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "cid",
+        "type": "string"
       }
     ],
     "name": "mintCertificate",
@@ -780,24 +772,6 @@
       }
     ],
     "name": "setApprovalForAll",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "tokenId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "string",
-        "name": "cid",
-        "type": "string"
-      }
-    ],
-    "name": "setCertificateCID",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

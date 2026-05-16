@@ -21,7 +21,11 @@ contract CertificateNFT is ERC721, AccessControl {
 
     event CertificateMinted(
         uint256 indexed tokenId,
-        address indexed recipient,
+        address indexed recipient
+    );
+
+    event CertificateCIDSet(
+        uint256 indexed tokenId,
         string cid
     );
 
@@ -41,26 +45,39 @@ contract CertificateNFT is ERC721, AccessControl {
     }
 
     function mintCertificate(
-        address recipient,
-        string memory cid
+        address recipient
     )
         external
         onlyRole(BPN_ROLE)
         returns (uint256)
     {
-
         uint256 tokenId = _tokenIdCounter++;
 
         _safeMint(recipient, tokenId);
-        _certificateCID[tokenId] = cid;
 
         _ownershipHistory[tokenId].push(
             OwnershipRecord(recipient, block.timestamp)
         );
 
-        emit CertificateMinted(tokenId, recipient, cid);
+        emit CertificateMinted(tokenId, recipient);
 
         return tokenId;
+    }
+
+    function setCertificateCID(
+        uint256 tokenId,
+        string memory cid
+    )
+        external
+        onlyRole(BPN_ROLE)
+    {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        require(bytes(_certificateCID[tokenId]).length == 0, "CID already set");
+        require(!revoked[tokenId], "Certificate revoked");
+
+        _certificateCID[tokenId] = cid;
+
+        emit CertificateCIDSet(tokenId, cid);
     }
 
     function transferOwnershipByBPN(
@@ -124,6 +141,16 @@ contract CertificateNFT is ERC721, AccessControl {
         return _ownershipHistory[tokenId];
     }
 
+    function isVerified(uint256 tokenId)
+        public
+        view
+        returns (bool)
+    {
+        return
+            _ownerOf(tokenId) != address(0) &&
+            !revoked[tokenId];
+    }
+
     function supportsInterface(bytes4 interfaceId)
         public
         view
@@ -131,9 +158,5 @@ contract CertificateNFT is ERC721, AccessControl {
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
-    }
-
-    function isVerified(uint256 tokenId) public view returns (bool) {
-        return bytes(_certificateCID[tokenId]).length > 0 && _ownerOf(tokenId) != address(0) && !revoked[tokenId];
     }
 }

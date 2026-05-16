@@ -27,8 +27,17 @@ export const submit = async (
   next: NextFunction,
 ) => {
   try {
-    const { fullName, nik, phone, birthPlace, birthDate, gender, address } =
-      req.body;
+    const {
+      fullName,
+      nik,
+      phone,
+      birthPlace,
+      birthDate,
+      gender,
+      address,
+      publicKey,
+      wallet_address,
+    } = req.body;
 
     const personId = req.person?.id as string;
 
@@ -40,7 +49,9 @@ export const submit = async (
       !birthPlace ||
       !birthDate ||
       !gender ||
-      !address
+      !address ||
+      !publicKey ||
+      !wallet_address
     ) {
       throw new AppError("Semua field wajib diisi", 400);
     }
@@ -54,6 +65,8 @@ export const submit = async (
       birthDate,
       gender,
       address,
+      publicKey,
+      wallet_address,
     });
     res.status(201).json({
       status: "success",
