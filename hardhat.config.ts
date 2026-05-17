@@ -1,7 +1,7 @@
 import type { HardhatUserConfig } from "hardhat/config";
 
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
-import "dotenv/config"
+import "dotenv/config";
 
 const config: HardhatUserConfig = {
   plugins: [hardhatToolboxViemPlugin],
@@ -27,12 +27,16 @@ const config: HardhatUserConfig = {
       url: process.env.RPC_URL!,
       accounts: [process.env.PRIVATE_KEY!],
     },
+    localhost: {
+      url: "http://127.0.0.1:8545",
+      type: "http",
+    },
   },
-  verify : {
-    etherscan : {
-      apiKey : process.env.ETHERSCAN_API_KEY!
-    }
-  }
+  verify: {
+    etherscan: {
+      apiKey: process.env.ETHERSCAN_API_KEY!,
+    },
+  },
 };
 
 export default config;
