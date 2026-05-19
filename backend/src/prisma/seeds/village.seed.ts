@@ -20,7 +20,7 @@ export const villageModule = async (prisma: PrismaClient) => {
     .on("end", async () => {
       try {
         const data = results.map((r: any) => ({
-          code: BigInt(r.code),
+          code: r.code,
           district_code: Number(r.district_code),
           name: r.name,
         }));
