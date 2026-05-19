@@ -5,71 +5,152 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract CertificateNFT is ERC721, AccessControl {
+
     uint256 private _tokenIdCounter = 1;
 
-    // Role Definitions
     bytes32 public constant BPN_ROLE = keccak256("BPN_ROLE");
-    bytes32 public constant CITIZEN_ROLE = keccak256("CITIZEN_ROLE");
 
-    // CID Storage
-    mapping(uint256 => string) private _certificateCID;
+    struct OwnershipRecord {
+        address owner;
+        uint256 timestamp;
+    }
+
+    mapping(uint256 => string) public _certificateCID;
+    mapping(uint256 => bool) public revoked;
+    mapping(uint256 => OwnershipRecord[]) private _ownershipHistory;
 
     event CertificateMinted(
         uint256 indexed tokenId,
-        address indexed recipient,
+        address indexed recipient
+    );
+
+    event CertificateCIDSet(
+        uint256 indexed tokenId,
         string cid
     );
 
-    constructor(address admin) ERC721("PolyLand NFT", "PLYNFT") {
+    event OwnershipTransferredByBPN(
+        uint256 indexed tokenId,
+        address indexed from,
+        address indexed to
+    );
+
+    event CertificateRevoked(uint256 indexed tokenId);
+
+    constructor(address admin)
+        ERC721("PolyLand NFT", "PLYNFT")
+    {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(BPN_ROLE, admin);
     }
 
-    function mintCertificate(address recipient, string memory cid)
-        public
+    function mintCertificate(
+        address recipient
+    )
+        external
         onlyRole(BPN_ROLE)
         returns (uint256)
     {
-        uint256 newTokenId = _tokenIdCounter;
+        uint256 tokenId = _tokenIdCounter++;
 
-        _safeMint(recipient, newTokenId);
-        _certificateCID[newTokenId] = cid;
+        _safeMint(recipient, tokenId);
 
-        emit CertificateMinted(newTokenId, recipient, cid);
+        _ownershipHistory[tokenId].push(
+            OwnershipRecord(recipient, block.timestamp)
+        );
 
-        _tokenIdCounter++;
-        return newTokenId;
+        emit CertificateMinted(tokenId, recipient);
+
+        return tokenId;
     }
 
-    function getCID(uint256 tokenId) public view returns (string memory) {
-        try this.ownerOf(tokenId) returns (address) {
-            return _certificateCID[tokenId];
-        } catch {
-            revert("Token does not exist");
+    function setCertificateCID(
+        uint256 tokenId,
+        string memory cid
+    )
+        external
+        onlyRole(BPN_ROLE)
+    {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        require(bytes(_certificateCID[tokenId]).length == 0, "CID already set");
+        require(!revoked[tokenId], "Certificate revoked");
+
+        _certificateCID[tokenId] = cid;
+
+        emit CertificateCIDSet(tokenId, cid);
+    }
+
+    function transferOwnershipByBPN(
+        uint256 tokenId,
+        address newOwner,
+        string memory newCid
+    )
+        external
+        onlyRole(BPN_ROLE)
+    {
+        require(!revoked[tokenId], "Certificate revoked");
+
+        address currentOwner = ownerOf(tokenId);
+
+        _transfer(currentOwner, newOwner, tokenId);
+
+        _certificateCID[tokenId] = newCid;
+
+        _ownershipHistory[tokenId].push(
+            OwnershipRecord(newOwner, block.timestamp)
+        );
+
+        emit OwnershipTransferredByBPN(
+            tokenId,
+            currentOwner,
+            newOwner
+        );
+    }
+
+    function revoke(uint256 tokenId)
+        external
+        onlyRole(BPN_ROLE)
+    {
+        revoked[tokenId] = true;
+        emit CertificateRevoked(tokenId);
+    }
+
+    function _update(
+        address to,
+        uint256 tokenId,
+        address auth
+    )
+        internal
+        override
+        returns (address)
+    {
+        address from = _ownerOf(tokenId);
+
+        if (from != address(0) && to != address(0)) {
+            revert("Direct transfer not allowed");
         }
+
+        return super._update(to, tokenId, auth);
     }
 
-    function verifyCertificate(uint256 tokenId)
+    function getOwnershipHistory(uint256 tokenId)
+        external
+        view
+        returns (OwnershipRecord[] memory)
+    {
+        return _ownershipHistory[tokenId];
+    }
+
+    function isVerified(uint256 tokenId)
         public
         view
-        returns (bool valid, address owner, string memory cid)
+        returns (bool)
     {
-        try this.ownerOf(tokenId) returns (address tokenOwner) {
-            return (true, tokenOwner, _certificateCID[tokenId]);
-        } catch {
-            return (false, address(0), "");
-        }
+        return
+            _ownerOf(tokenId) != address(0) &&
+            !revoked[tokenId];
     }
 
-    function addBPN(address account) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _grantRole(BPN_ROLE, account);
-    }
-
-    function addCitizen(address account) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        _grantRole(CITIZEN_ROLE, account);
-    }
-
-    /// @inheritdoc IERC165
     function supportsInterface(bytes4 interfaceId)
         public
         view

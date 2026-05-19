@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-0d156f7cbc512eac8a859e980cd4d68e978263ef",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/ApplicationPayment.sol": "project/contracts/ApplicationPayment.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/ApplicationPayment.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\ncontract ApplicationPayment {\n\n    address public owner; // deployer\n\n    struct PaymentInfo {\n        address payer; // address buyer\n        string kantahCode; // kode kantah\n        uint256 area; // luas tanah\n        uint256 amount;\n        uint256 timestamp;\n    }\n\n    mapping(string => PaymentInfo) public payments;\n\n    // mapping harga tanah per meter disetiap kantah\n    mapping(string => uint256) public kantahPrices;\n\n    event PaymentReceived( \n        string indexed applicationId,\n        string kantahCode,\n        address indexed payer,\n        uint256 area,\n        uint256 amount,\n        uint256 timestamp\n    );\n\n    constructor() {\n        owner = msg.sender;\n    }\n\n    // function untuk mengatur harga tanah per meter disetiap kantah\n    function setKantahPrice(\n        string memory kantahCode,\n        uint256 price\n    ) external {\n        require(msg.sender == owner, \"Not owner\");\n        kantahPrices[kantahCode] = price;\n    }\n\n    // Function pembayaran\n    function pay(\n        string memory applicationId,\n        string memory kantahCode,\n        uint256 area\n    )\n        external\n        payable\n    {\n        require(payments[applicationId].payer == address(0), \"Already paid\");\n\n        uint256 price = kantahPrices[kantahCode];\n        require(price > 0, \"Price not set\");\n\n        uint256 requiredAmount = area * price;\n        require(msg.value == requiredAmount, \"Incorrect payment\");\n\n        payments[applicationId] = PaymentInfo({\n            payer: msg.sender,\n            kantahCode: kantahCode,\n            area: area,\n            amount: msg.value,\n            timestamp: block.timestamp\n        });\n\n        emit PaymentReceived(\n            applicationId,\n            kantahCode,\n            msg.sender,\n            area,\n            msg.value,\n            block.timestamp\n        );\n    }\n\n    // check apakah sudah dibayar\n    function isPaid(string memory applicationId)\n        external\n        view\n        returns (bool)\n    {\n        return payments[applicationId].payer != address(0);\n    }\n\n    // check pembayaran\n    function getPaymentInfo(string memory applicationId)\n        external\n        view\n        returns (PaymentInfo memory)\n    {\n        return payments[applicationId];\n    }\n\n    // tarik saldo\n    function withdraw() external {\n        require(msg.sender == owner, \"Not owner\");\n        payable(owner).transfer(address(this).balance);\n    }\n}"
+      }
+    }
+  }
+}

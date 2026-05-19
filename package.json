@@ -3,30 +3,68 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "server": "nodemon backend/src/app.ts"
+    "dev": "npx nodemon --exec \"tsx\" backend/src/app.ts",
+    "service": "sudo systemctl start postgresql && sudo systemctl start redis-server"
+  },
+  "prisma": {
+    "seed": "npx tsx backend/src/prisma/seeds/seed.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.0.5",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.1",
+    "@nomicfoundation/hardhat-verify": "^3.0.11",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/crypto-js": "^4.2.2",
     "@types/express": "^5.0.5",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/k6": "^2.0.0",
     "@types/node": "^22.19.7",
     "@types/pg": "^8.16.0",
+    "@types/qrcode": "^1.5.6",
+    "chai": "^6.2.2",
     "forge-std": "github:foundry-rs/forge-std#v1.9.4",
     "hardhat": "^3.0.15",
     "nodemon": "^3.1.11",
     "prisma": "^7.3.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.8.0",
-    "viem": "^2.39.0"
+    "viem": "^2.45.1",
+    "vitest": "^4.1.6"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.4.0",
     "@openzeppelin/contracts": "^5.4.0",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/multer": "^2.0.0",
+    "axios": "^1.15.2",
+    "bcrypt": "^6.0.0",
+    "bullmq": "^5.76.8",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "crypto-js": "^4.2.0",
+    "csv-parser": "^3.2.0",
     "dotenv": "^17.2.3",
+    "eciesjs": "^0.5.0",
     "express": "^5.1.0",
+    "form-data": "^4.0.5",
+    "fs": "^0.0.1-security",
+    "handlebars": "^4.7.8",
+    "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
     "pg": "^8.18.0",
     "pinata": "^2.5.1",
-    "ts-node": "^10.9.2"
+    "puppeteer": "^24.37.5",
+    "qrcode": "^1.5.4",
+    "redis": "^5.10.0",
+    "socket.io": "^4.8.3",
+    "ts-node": "^10.9.2",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
   }
 }

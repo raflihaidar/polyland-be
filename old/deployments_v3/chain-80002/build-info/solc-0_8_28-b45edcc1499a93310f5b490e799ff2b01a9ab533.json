@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-b45edcc1499a93310f5b490e799ff2b01a9ab533",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/ApplicationPayment.sol": "project/contracts/ApplicationPayment.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/ApplicationPayment.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\ncontract ApplicationPayment {\n\n    address public owner;\n\n    struct PaymentInfo {\n        address payer;\n        string kantahCode;\n        uint256 area;\n        uint256 amount;\n        uint256 timestamp;\n    }\n\n    struct KantahFee {\n        uint256 landPricePerM2;\n        uint256 registrationFee;\n        bool exists;\n    }\n\n    // applicationId => payment\n    mapping(string => PaymentInfo) public payments;\n\n    // kantahCode => fee config\n    mapping(string => KantahFee) public kantahFees;\n\n    event KantahFeeUpdated(\n        string kantahCode,\n        uint256 landPricePerM2,\n        uint256 registrationFee\n    );\n\n    event PaymentReceived(\n        string indexed applicationId,\n        string kantahCode,\n        address indexed payer,\n        uint256 area,\n        uint256 amount,\n        uint256 timestamp\n    );\n\n    constructor() {\n        owner = msg.sender;\n    }\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Not owner\");\n        _;\n    }\n\n    function setKantahFee(\n        string memory kantahCode,\n        uint256 landPricePerM2,\n        uint256 registrationFee\n    )\n        external\n        onlyOwner\n    {\n        require(landPricePerM2 > 0, \"Invalid land price\");\n\n        kantahFees[kantahCode] = KantahFee({\n            landPricePerM2: landPricePerM2,\n            registrationFee: registrationFee,\n            exists: true\n        });\n\n        emit KantahFeeUpdated(\n            kantahCode,\n            landPricePerM2,\n            registrationFee\n        );\n    }\n\n    function calculateCost(\n        string memory kantahCode,\n        uint256 area\n    )\n        public\n        view\n        returns (uint256)\n    {\n        KantahFee memory fee = kantahFees[kantahCode];\n\n        require(fee.exists, \"Kantah not set\");\n\n        uint256 landCost =\n            (fee.landPricePerM2 * area) / 1000;\n\n        return landCost + fee.registrationFee;\n    }\n\n    function pay(\n        string memory applicationId,\n        string memory kantahCode,\n        uint256 area\n    )\n        external\n        payable\n    {\n        require(\n            payments[applicationId].payer == address(0),\n            \"Already paid\"\n        );\n\n        uint256 requiredAmount =\n            calculateCost(kantahCode, area);\n\n        require(\n            msg.value == requiredAmount,\n            \"Incorrect payment\"\n        );\n\n        payments[applicationId] = PaymentInfo({\n            payer: msg.sender,\n            kantahCode: kantahCode,\n            area: area,\n            amount: msg.value,\n            timestamp: block.timestamp\n        });\n\n        emit PaymentReceived(\n            applicationId,\n            kantahCode,\n            msg.sender,\n            area,\n            msg.value,\n            block.timestamp\n        );\n    }\n\n    function isPaid(\n        string memory applicationId\n    )\n        external\n        view\n        returns (bool)\n    {\n        return payments[applicationId].payer != address(0);\n    }\n\n    function getPaymentInfo(\n        string memory applicationId\n    )\n        external\n        view\n        returns (PaymentInfo memory)\n    {\n        return payments[applicationId];\n    }\n\n    function withdraw()\n        external\n        onlyOwner\n    {\n        payable(owner).transfer(\n            address(this).balance\n        );\n    }\n}"
+      }
+    }
+  }
+}
