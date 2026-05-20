@@ -2,20 +2,11 @@ module.exports = {
   apps: [
     {
       name: "polyland-api",
-
-      script: "./backend/src/app.ts",
-
-      interpreter: "node",
-
-      interpreter_args:
-        "--experimental-transform-types --max_old_space_size=1400 --env-file=.env",
-
-      watch: false,
-
-      autorestart: true,
-
+      script: "backend/src/app.ts",
+      interpreter: "npx",
+      args: "tsx",
       env: {
-        NODE_ENV: "production",
+        NODE_ENV: "development",
         PORT: 5000,
       },
     },
