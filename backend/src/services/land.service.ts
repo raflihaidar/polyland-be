@@ -1,6 +1,6 @@
-import { prisma } from "../config/prisma";
-import { Prisma } from "../generated/prisma/client";
-import { AppError } from "../utils/error";
+import { prisma } from "../config/prisma.js";
+import { Prisma } from "../generated/prisma/client.js";
+import { AppError } from "../utils/error.js";
 
 type DBClient = Prisma.TransactionClient | typeof prisma;
 

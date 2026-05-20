@@ -1,6 +1,6 @@
-import * as PersonService from "../services/person.service";
+import * as PersonService from "../services/person.service.js";
 import { NextFunction, Request, Response } from "express";
-import { AppError } from "../utils/error";
+import { AppError } from "../utils/error.js";
 
 export const searchPerson = async (
   req: Request,

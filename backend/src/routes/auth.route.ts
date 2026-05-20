@@ -7,8 +7,8 @@ import {
   loginWalletVerifyHandler,
   refresh,
   user,
-} from "../controllers/auth.controller";
-import { authentication } from "../middlewares/authentication";
+} from "../controllers/auth.controller.js";
+import { authentication } from "../middlewares/authentication.js";
 
 const router = express.Router();
 router.post("/register", register);

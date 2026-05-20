@@ -1,10 +1,12 @@
-import { prisma } from "../config/prisma";
-import { AppError } from "../utils/error";
+import { prisma } from "../config/prisma.js";
+import { AppError } from "../utils/error.js";
 import {
   VerificationAccountCreate,
   VerificationAccountUpdate,
-} from "../types/domain/verificationAccount.type";
-import { VerificationStatus } from "../generated/prisma/client";
+} from "../types/domain/verificationAccount.type.js";
+import { VerificationStatus } from "../generated/prisma/enums.js";
+import { Prisma } from "@prisma/client/extension";
+import { Role } from "../generated/prisma/client.js";
 
 export const isVerified = async (person_id: string) => {
   try {
@@ -68,7 +70,7 @@ export const verify = async (data: VerificationAccountUpdate) => {
     const isApproved =
       verificationAccount.status === VerificationStatus.APPROVED;
     if (verificationAccount && isApproved) {
-      return await prisma.$transaction(async (tx) => {
+      return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const person = await tx.person.update({
           where: {
             id: verificationAccount.person_id,
@@ -94,7 +96,7 @@ export const verify = async (data: VerificationAccountUpdate) => {
           },
         });
 
-        if (person.roles.some((role) => role.role_id === 6)) {
+        if (person.roles.some((role: Role) => role.role_id === 6)) {
           await tx.rolePerson.update({
             where: {
               person_id_role_id: {

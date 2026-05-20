@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { AppError } from "../utils/error";
+import { AppError } from "../utils/error.js";
 
 export const getMitra = async (
   req: Request,
@@ -7,7 +7,6 @@ export const getMitra = async (
   next: NextFunction,
 ) => {
   try {
-    console.log("getMitra");
     res.status(200).json({
       status: "success",
       message: "Data mitra berhasil diambil",

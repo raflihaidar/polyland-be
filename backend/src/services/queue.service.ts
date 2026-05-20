@@ -1,7 +1,7 @@
-import { DayOfWeek, QueueStatus } from "../generated/prisma/enums";
-import { prisma } from "../config/prisma";
-import { PrismaClient } from "../generated/prisma/client";
-import { AppError } from "../utils/error";
+import { DayOfWeek, QueueStatus } from "../generated/prisma/enums.js";
+import { prisma } from "../config/prisma.js";
+import { PrismaClient } from "../generated/prisma/client.js";
+import { AppError } from "../utils/error.js";
 
 /**
  * Map JS Date.getDay() → DayOfWeek enum (Senin = 1 … Minggu = 0)
@@ -572,7 +572,7 @@ export const updateQueueStatus = async (input: UpdateQueueStatusInput) => {
     const queue = await prisma.queue.findUnique({ where: { id: queueId } });
     if (!queue) throw new Error("Antrian tidak ditemukan.");
 
-    const allowed = ALLOWED_TRANSITIONS[queue.status] ?? [];
+    const allowed = ALLOWED_TRANSITIONS[queue.status as QueueStatus] ?? [];
     if (!allowed.includes(status)) {
       throw new AppError(
         `Tidak dapat mengubah status dari "${queue.status}" ke "${status}".`,

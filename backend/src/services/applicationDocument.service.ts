@@ -1,5 +1,5 @@
 import path from "path";
-import { DocumentType } from "../generated/prisma/enums";
+import { DocumentType } from "../generated/prisma/enums.js";
 
 export const mapApplicationDocuments = (applicationId: string, data: any) => {
   const docs: any[] = [];

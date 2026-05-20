@@ -1,6 +1,6 @@
-import * as VerifService from "../services/verificationAccount.service";
+import * as VerifService from "../services/verificationAccount.service.js";
 import { NextFunction, Request, Response } from "express";
-import { AppError } from "../utils/error";
+import { AppError } from "../utils/error.js";
 
 export const check = async (
   req: Request,

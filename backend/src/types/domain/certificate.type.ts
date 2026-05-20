@@ -1,7 +1,7 @@
 import {
   CertificateStatus,
   CertificateType,
-} from "../../generated/prisma/enums";
+} from "../../generated/prisma/enums.js";
 
 export interface CertificateCreate {
   old_code: string;

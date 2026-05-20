@@ -7,10 +7,10 @@ import {
   updateApplicationStatus,
   updateApplication,
   verifyPayment,
-} from "../controllers/ownershipTransfer.controller";
-import { authentication } from "../middlewares/authentication";
-import { authorize } from "../middlewares/authorization";
-import { upload, uploadUpdate } from "../middlewares/fileUpload";
+} from "../controllers/ownershipTransfer.controller.js";
+import { authentication } from "../middlewares/authentication.js";
+import { authorize } from "../middlewares/authorization.js";
+import { upload, uploadUpdate } from "../middlewares/fileUpload.js";
 
 const router = express.Router();
 

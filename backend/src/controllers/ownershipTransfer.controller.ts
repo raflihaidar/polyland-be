@@ -1,11 +1,11 @@
-import * as ownershipService from "../services/ownershipTransfer.service";
+import * as ownershipService from "../services/ownershipTransfer.service.js";
 import { NextFunction, Request, Response } from "express";
-import { AppError } from "../utils/error";
+import { AppError } from "../utils/error.js";
 import {
   ApplicationCreate,
   ApplicationUpdate,
-} from "../types/domain/ownershipTransfer.type";
-import { ApplicationStatus } from "../generated/prisma/enums";
+} from "../types/domain/ownershipTransfer.type.js";
+import { ApplicationStatus } from "../generated/prisma/enums.js";
 import fs from "fs";
 import path from "path";
 

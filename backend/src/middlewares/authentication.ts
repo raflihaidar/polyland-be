@@ -1,7 +1,7 @@
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
-import { ACCESS_TOKEN_SECRET } from "../config/token";
-import { prisma } from "../config/prisma";
+import { ACCESS_TOKEN_SECRET } from "../config/token.js";
+import { prisma } from "../config/prisma.js";
 
 export async function authentication(
   req: Request,
@@ -46,7 +46,7 @@ export async function authentication(
 
     req.person = {
       id: person.id,
-      roles: person.roles.map((rp) => rp.role.name),
+      roles: person.roles.map((rp: any) => rp.role.name),
     };
     next();
   } catch (err: any) {

@@ -6,9 +6,9 @@ import {
   getLandOfficeById,
   updateLandOffice,
   deleteLandOffice,
-} from "../controllers/landOffice.controller";
-import { authentication } from "../middlewares/authentication";
-import { authorize } from "../middlewares/authorization";
+} from "../controllers/landOffice.controller.js";
+import { authentication } from "../middlewares/authentication.js";
+import { authorize } from "../middlewares/authorization.js";
 
 const router = Router();
 

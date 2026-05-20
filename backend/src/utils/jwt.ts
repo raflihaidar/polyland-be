@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
-import { ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET } from "../config/token";
-import type { AuthPerson } from "../types/auth.type";
+import { ACCESS_TOKEN_SECRET, REFRESH_TOKEN_SECRET } from "../config/token.js";
+import type { AuthPerson } from "../types/auth.type.js";
 
 export function generateTokens(person: AuthPerson) {
   if (!ACCESS_TOKEN_SECRET || !REFRESH_TOKEN_SECRET) {

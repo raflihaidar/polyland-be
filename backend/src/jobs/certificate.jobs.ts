@@ -1,4 +1,4 @@
-import { certificateQueue } from "../queues/certificate.queue";
+import { certificateQueue } from "../queues/certificate.queue.js";
 
 export const addCertificateJob = async ({
   fileNumber,

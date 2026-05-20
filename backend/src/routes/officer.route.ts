@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { createHeadOffice } from "../controllers/officer.controller";
-import { authentication } from "../middlewares/authentication";
-import { authorize } from "../middlewares/authorization";
+import { createHeadOffice } from "../controllers/officer.controller.js";
+import { authentication } from "../middlewares/authentication.js";
+import { authorize } from "../middlewares/authorization.js";
 
 const router = Router();
 

@@ -1,12 +1,15 @@
-/* Based on https://github.com/tsconfig/bases/blob/501da2bcd640cf95c95805783e1012b992338f28/bases/node22.json */
 {
   "compilerOptions": {
-    "target": "ES2023",
-    "module": "CommonJS",
-    "rootDir": "src",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": ".",
     "outDir": "dist",
-    "strict": true,
+
+    "resolveJsonModule": true,
     "esModuleInterop": true,
+    "skipLibCheck": true
   },
-  "include": ["src"],
+  "include": ["backend/src"],
+  "exclude": ["node_modules", "dist"]
 }

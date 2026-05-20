@@ -1,4 +1,4 @@
-import { Gender, VerificationStatus } from "../../generated/prisma/client";
+import { Gender, VerificationStatus } from "../../generated/prisma/enums.js";
 
 export interface VerificationAccountCreate {
   person_id: string;

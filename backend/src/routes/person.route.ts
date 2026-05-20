@@ -1,6 +1,6 @@
 import express from "express";
-import { searchPerson } from "../controllers/person.controller";
-import { authentication } from "../middlewares/authentication";
+import { searchPerson } from "../controllers/person.controller.js";
+import { authentication } from "../middlewares/authentication.js";
 // import { authorize } from "../middlewares/authorization";
 
 const router = express.Router();

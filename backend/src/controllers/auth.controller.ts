@@ -1,6 +1,6 @@
-import * as AuthService from "../services/auth.service";
+import * as AuthService from "../services/auth.service.js";
 import { NextFunction, Request, Response } from "express";
-import { AppError } from "../utils/error";
+import { AppError } from "../utils/error.js";
 import bcrypt from "bcrypt";
 
 export const register = async (

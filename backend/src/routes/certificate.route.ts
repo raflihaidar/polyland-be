@@ -6,9 +6,9 @@ import {
   verifyCertificate,
   searchCertificate,
   updateLabelCertificate,
-} from "../controllers/certificate.controller";
-import { authentication } from "../middlewares/authentication";
-import { authorize } from "../middlewares/authorization";
+} from "../controllers/certificate.controller.js";
+import { authentication } from "../middlewares/authentication.js";
+import { authorize } from "../middlewares/authorization.js";
 
 const router = express.Router();
 

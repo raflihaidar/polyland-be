@@ -1,23 +1,22 @@
-import { prisma } from "../config/prisma";
-import { Prisma } from "../generated/prisma/client";
-import { AppError } from "../utils/error";
+import { prisma } from "../config/prisma.js";
+import { ApplicationOwner, Prisma } from "../generated/prisma/client.js";
+import { AppError } from "../utils/error.js";
 import {
   ApplicationCreate,
   ApplicationUpdate,
-} from "../types/domain/ownershipTransfer.type";
+} from "../types/domain/ownershipTransfer.type.js";
 import {
-  DocumentType,
   ApplicationStatus,
   CertificateType,
-} from "../generated/prisma/enums";
-import * as fileCounterService from "./fileCounter.service";
-import * as landService from "./land.service";
-import * as AppDocumentService from "./applicationDocument.service";
+} from "../generated/prisma/enums.js";
+import * as fileCounterService from "./fileCounter.service.js";
+import * as landService from "./land.service.js";
+import * as AppDocumentService from "./applicationDocument.service.js";
 // import { generateCertificate } from "./certificate.service";
-import { addCertificateJob } from "../jobs/certificate.jobs";
+import { addCertificateJob } from "../jobs/certificate.jobs.js";
 import fs from "fs";
-import { serializeBigInt } from "../utils/parse";
-import { moveTempFolder } from "../utils/file";
+import { serializeBigInt } from "../utils/parse.js";
+import { moveTempFolder } from "../utils/file.js";
 import path from "path";
 
 export const getListApplication = async (
@@ -213,7 +212,7 @@ export const getApplication = async (id: string) => {
     return {
       ...application,
       total_fee: Number(application.total_fee),
-      owners: application?.owners.map((o) => {
+      owners: application?.owners.map((o: ApplicationOwner) => {
         const { documentIdentity, ...person } = o.person;
 
         return {
@@ -290,98 +289,100 @@ export const submitApplication = async (
   tempFolder: string,
 ) => {
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const year = new Date().getFullYear().toString().slice(-2);
+    const result = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const year = new Date().getFullYear().toString().slice(-2);
 
-      const lastNumber = await fileCounterService.increment(tx);
+        const lastNumber = await fileCounterService.increment(tx);
 
-      const land = await landService.findById(tx, data.land_id);
+        const land = await landService.findById(tx, data.land_id);
 
-      const landOffice = await tx.landOffice.findFirst({
-        where: { id: data.land_office_id },
-        include: { price: true },
-      });
-
-      if (!landOffice?.price) {
-        throw new AppError("Harga tanah kantor belum diatur", 400);
-      }
-
-      if (!land) {
-        throw new AppError("Data tanah tidak ditemukan", 400);
-      }
-
-      if (!land.area_size) {
-        throw new AppError("Data tanah tidak memiliki luas", 400);
-      }
-
-      // Owner pertama = pemohon
-      const applicant = data.owners[0];
-
-      if (!applicant.person_id) {
-        throw new AppError("Pemohon utama tidak valid", 400);
-      }
-
-      const file_number = `${landOffice.code}/${data.cert_type}/${year}/${lastNumber}`;
-
-      const areaSize = Number(land.area_size) || 0;
-      const pricePerM2 = Number(landOffice.price.price_per_m2) || 0;
-      const registrationFee = Number(landOffice.price.registration_fee) || 0;
-
-      const landValue = areaSize * pricePerM2;
-      const adminFee = landValue / 1000;
-      const totalFeeCalculated = adminFee + registrationFee;
-
-      const finalTotalFee = isNaN(totalFeeCalculated)
-        ? 0
-        : Math.round(totalFeeCalculated);
-
-      const application = await tx.application.create({
-        data: {
-          person: {
-            connect: { id: applicant.person_id },
-          },
-          land: {
-            connect: { id: data.land_id },
-          },
-          landOffice: {
-            connect: { id: data.land_office_id },
-          },
-          officer: {
-            connect: {
-              id: data.officer_id,
-            },
-          },
-          cert_code: data.cert_code,
-          file_number,
-          land_price_per_m2: landOffice.price.price_per_m2,
-          registration_fee: landOffice.price.registration_fee,
-          total_fee: BigInt(finalTotalFee),
-          nib: data.nib,
-          type: data.cert_type,
-        },
-      });
-
-      const documents = AppDocumentService.mapApplicationDocuments(
-        application.id,
-        data,
-      );
-
-      if (documents.length > 0) {
-        await tx.applicationDocument.createMany({
-          data: documents,
+        const landOffice = await tx.landOffice.findFirst({
+          where: { id: data.land_office_id },
+          include: { price: true },
         });
-      }
 
-      await tx.applicationOwner.createMany({
-        data: data.owners.map((owner) => ({
-          application_id: application.id,
-          person_id: owner.person_id,
-          share: Number(owner.share) ?? null,
-        })),
-      });
+        if (!landOffice?.price) {
+          throw new AppError("Harga tanah kantor belum diatur", 400);
+        }
 
-      return application;
-    });
+        if (!land) {
+          throw new AppError("Data tanah tidak ditemukan", 400);
+        }
+
+        if (!land.area_size) {
+          throw new AppError("Data tanah tidak memiliki luas", 400);
+        }
+
+        // Owner pertama = pemohon
+        const applicant = data.owners[0];
+
+        if (!applicant.person_id) {
+          throw new AppError("Pemohon utama tidak valid", 400);
+        }
+
+        const file_number = `${landOffice.code}/${data.cert_type}/${year}/${lastNumber}`;
+
+        const areaSize = Number(land.area_size) || 0;
+        const pricePerM2 = Number(landOffice.price.price_per_m2) || 0;
+        const registrationFee = Number(landOffice.price.registration_fee) || 0;
+
+        const landValue = areaSize * pricePerM2;
+        const adminFee = landValue / 1000;
+        const totalFeeCalculated = adminFee + registrationFee;
+
+        const finalTotalFee = isNaN(totalFeeCalculated)
+          ? 0
+          : Math.round(totalFeeCalculated);
+
+        const application = await tx.application.create({
+          data: {
+            person: {
+              connect: { id: applicant.person_id },
+            },
+            land: {
+              connect: { id: data.land_id },
+            },
+            landOffice: {
+              connect: { id: data.land_office_id },
+            },
+            officer: {
+              connect: {
+                id: data.officer_id,
+              },
+            },
+            cert_code: data.cert_code,
+            file_number,
+            land_price_per_m2: landOffice.price.price_per_m2,
+            registration_fee: landOffice.price.registration_fee,
+            total_fee: BigInt(finalTotalFee),
+            nib: data.nib,
+            type: data.cert_type,
+          },
+        });
+
+        const documents = AppDocumentService.mapApplicationDocuments(
+          application.id,
+          data,
+        );
+
+        if (documents.length > 0) {
+          await tx.applicationDocument.createMany({
+            data: documents,
+          });
+        }
+
+        await tx.applicationOwner.createMany({
+          data: data.owners.map((owner) => ({
+            application_id: application.id,
+            person_id: owner.person_id,
+            share: Number(owner.share) ?? null,
+          })),
+        });
+
+        return application;
+      },
+    );
 
     moveTempFolder(tempFolder, `applications/${result.id}`);
     return {
@@ -448,150 +449,152 @@ export const updateApplication = async (
 ) => {
   const filesToDelete: string[] = [];
 
-  const result = await prisma.$transaction(async (tx) => {
-    // ======================
-    // CHECK APPLICATION
-    // ======================
+  const result = await prisma.$transaction(
+    async (tx: Prisma.TransactionClient) => {
+      // ======================
+      // CHECK APPLICATION
+      // ======================
 
-    const application = await tx.application.findUnique({
-      where: {
-        id: applicationId,
-      },
-    });
+      const application = await tx.application.findUnique({
+        where: {
+          id: applicationId,
+        },
+      });
 
-    if (!application) {
-      throw new AppError("Permohonan tidak ditemukan", 404);
-    }
+      if (!application) {
+        throw new AppError("Permohonan tidak ditemukan", 404);
+      }
 
-    // ======================
-    // UPDATE APPLICATION
-    // ======================
+      // ======================
+      // UPDATE APPLICATION
+      // ======================
 
-    const updateData = Object.fromEntries(
-      Object.entries({
-        person_id: data.person_id,
-        land_id: data.land_id,
-        cert_code: data.cert_code,
-        type: data.cert_type,
-        nib: data.nib,
-        officer_id: data.officer_id,
-        land_office_id: data.land_office_id,
-      }).filter(([_, value]) => value !== undefined),
-    );
+      const updateData = Object.fromEntries(
+        Object.entries({
+          person_id: data.person_id,
+          land_id: data.land_id,
+          cert_code: data.cert_code,
+          type: data.cert_type,
+          nib: data.nib,
+          officer_id: data.officer_id,
+          land_office_id: data.land_office_id,
+        }).filter(([_, value]) => value !== undefined),
+      );
 
-    await tx.application.update({
-      where: {
-        id: applicationId,
-      },
-      data: updateData,
-    });
+      await tx.application.update({
+        where: {
+          id: applicationId,
+        },
+        data: updateData,
+      });
 
-    // ======================
-    // UPSERT OWNERS
-    // ======================
+      // ======================
+      // UPSERT OWNERS
+      // ======================
 
-    if ((data.owners ?? []).length > 0) {
-      await Promise.all(
-        (data.owners ?? []).map((owner) =>
-          tx.applicationOwner.upsert({
-            where: {
-              application_id_person_id: {
+      if ((data.owners ?? []).length > 0) {
+        await Promise.all(
+          (data.owners ?? []).map((owner) =>
+            tx.applicationOwner.upsert({
+              where: {
+                application_id_person_id: {
+                  application_id: applicationId,
+                  person_id: owner.person_id,
+                },
+              },
+              update: {
+                share: owner.share,
+              },
+              create: {
                 application_id: applicationId,
                 person_id: owner.person_id,
+                share: owner.share,
               },
-            },
-            update: {
-              share: owner.share,
-            },
-            create: {
-              application_id: applicationId,
-              person_id: owner.person_id,
-              share: owner.share,
-            },
-          }),
-        ),
+            }),
+          ),
+        );
+      }
+
+      // ======================
+      // MAP DOCUMENTS
+      // ======================
+
+      const documents = AppDocumentService.mapApplicationDocuments(
+        applicationId,
+        data,
       );
-    }
 
-    // ======================
-    // MAP DOCUMENTS
-    // ======================
+      // ======================
+      // UPSERT DOCUMENTS
+      // ======================
 
-    const documents = AppDocumentService.mapApplicationDocuments(
-      applicationId,
-      data,
-    );
-
-    // ======================
-    // UPSERT DOCUMENTS
-    // ======================
-
-    if (documents.length > 0) {
-      await Promise.all(
-        documents.map(async (document) => {
-          const existingDocument = await tx.applicationDocument.findFirst({
-            where: {
-              application_id: applicationId,
-              person_id: document.person_id,
-              type: document.type,
-            },
-          });
-
-          // simpan file lama untuk dihapus
-          if (existingDocument?.fileUrl) {
-            filesToDelete.push(existingDocument.fileUrl);
-          }
-
-          await tx.applicationDocument.upsert({
-            where: {
-              application_id_person_id_type: {
+      if (documents.length > 0) {
+        await Promise.all(
+          documents.map(async (document) => {
+            const existingDocument = await tx.applicationDocument.findFirst({
+              where: {
                 application_id: applicationId,
                 person_id: document.person_id,
                 type: document.type,
               },
-            },
-            update: {
-              fileUrl: document.fileUrl,
-              fileName: document.fileName,
-              mimeType: document.mimeType,
-              fileSize: document.fileSize,
-            },
-            create: {
-              application_id: applicationId,
-              person_id: document.person_id,
-              type: document.type,
-              fileName: document.fileName,
-              fileUrl: document.fileUrl,
-              mimeType: document.mimeType,
-              fileSize: document.fileSize,
-            },
-          });
-        }),
-      );
-    }
+            });
 
-    moveTempFolder(tempFolder, `applications/${application.id}`);
+            // simpan file lama untuk dihapus
+            if (existingDocument?.fileUrl) {
+              filesToDelete.push(existingDocument.fileUrl);
+            }
 
-    // ======================
-    // GET FINAL RESULT
-    // ======================
+            await tx.applicationDocument.upsert({
+              where: {
+                application_id_person_id_type: {
+                  application_id: applicationId,
+                  person_id: document.person_id,
+                  type: document.type,
+                },
+              },
+              update: {
+                fileUrl: document.fileUrl,
+                fileName: document.fileName,
+                mimeType: document.mimeType,
+                fileSize: document.fileSize,
+              },
+              create: {
+                application_id: applicationId,
+                person_id: document.person_id,
+                type: document.type,
+                fileName: document.fileName,
+                fileUrl: document.fileUrl,
+                mimeType: document.mimeType,
+                fileSize: document.fileSize,
+              },
+            });
+          }),
+        );
+      }
 
-    const updatedApplication = await tx.application.findUnique({
-      where: {
-        id: applicationId,
-      },
-      include: {
-        owners: {
-          include: {
-            person: true,
-          },
+      moveTempFolder(tempFolder, `applications/${application.id}`);
+
+      // ======================
+      // GET FINAL RESULT
+      // ======================
+
+      const updatedApplication = await tx.application.findUnique({
+        where: {
+          id: applicationId,
         },
-        document: true,
-      },
-    });
+        include: {
+          owners: {
+            include: {
+              person: true,
+            },
+          },
+          document: true,
+        },
+      });
 
-    return updatedApplication;
-  });
+      return updatedApplication;
+    },
+  );
 
   // ======================
   // DELETE OLD FILES

@@ -1,5 +1,5 @@
-import { prisma } from "../config/prisma";
-import { AppError } from "../utils/error";
+import { prisma } from "../config/prisma.js";
+import { AppError } from "../utils/error.js";
 
 export const searchPerson = async (search: string) => {
   try {

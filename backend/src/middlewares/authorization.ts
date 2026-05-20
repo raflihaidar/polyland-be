@@ -1,5 +1,5 @@
-import { prisma } from "../config/prisma";
-import { redisClient } from "../config/redis";
+import { prisma } from "../config/prisma.js";
+import { redisClient } from "../config/redis.js";
 import { NextFunction, Request, Response } from "express";
 
 export const authorize = (module: string, action: string) => {
@@ -45,7 +45,7 @@ export const authorize = (module: string, action: string) => {
                     select: {
                       privilege: {
                         select: {
-                          action : true,
+                          action: true,
                           module: {
                             select: { slug: true },
                           },
@@ -67,16 +67,16 @@ export const authorize = (module: string, action: string) => {
       /**
        * 3️⃣ FLATTEN PERMISSION
        */
-      const permissions = user.roles.flatMap((rp) =>
+      const permissions = user.roles.flatMap((rp: any) =>
         rp.role.privileges.map(
-          (p) => `${p.privilege.module.slug}:${p.privilege.action}`,
+          (p: any) => `${p.privilege.module.slug}:${p.privilege.action}`,
         ),
       );
 
-      const uniquePermissions = [...new Set(permissions)];
+      const uniquePermissions: any = [...new Set(permissions)];
 
       await redisClient.del(permissionKey);
-      
+
       /**
        * 4️⃣ RE-CACHE KE REDIS
        */

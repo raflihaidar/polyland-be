@@ -1,7 +1,11 @@
 import express from "express";
-import { check, submit, verify } from "../controllers/verificationAccount.controller";
-import { authentication } from "../middlewares/authentication";
-import { authorize } from "../middlewares/authorization";
+import {
+  check,
+  submit,
+  verify,
+} from "../controllers/verificationAccount.controller.js";
+import { authentication } from "../middlewares/authentication.js";
+import { authorize } from "../middlewares/authorization.js";
 
 const router = express.Router();
 

@@ -1,11 +1,11 @@
-import { prisma } from "../../config/prisma";
-import { seedRoles } from "./role.seed";
-import { seedModules } from "./module.seed";
-import { seedRolePrivileges } from "./role-privilege.seed";
-import { landOfficeModules } from "./landOffice.seed";
-import { districtModule } from "./district.seed";
-import { villageModule } from "./village.seed";
-import { landCertificateModule } from "./land-certificate.seed";
+import { prisma } from "../../config/prisma.js";
+import { seedRoles } from "./role.seed.js";
+import { seedModules } from "./module.seed.js";
+import { seedRolePrivileges } from "./role-privilege.seed.js";
+import { landOfficeModules } from "./landOffice.seed.js";
+import { districtModule } from "./district.seed.js";
+import { villageModule } from "./village.seed.js";
+import { landCertificateModule } from "./land-certificate.seed.js";
 
 const main = async () => {
   const args = process.argv.slice(2);

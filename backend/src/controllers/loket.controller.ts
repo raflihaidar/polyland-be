@@ -1,8 +1,8 @@
-import * as LoketService from "../services/loket.service";
-import * as QueueService from "../services/queue.service";
+import * as LoketService from "../services/loket.service.js";
+import * as QueueService from "../services/queue.service.js";
 import { NextFunction, Request, Response } from "express";
-import { AppError } from "../utils/error";
-import { QueueStatus } from "../generated/prisma/enums";
+import { AppError } from "../utils/error.js";
+import { QueueStatus } from "../generated/prisma/enums.js";
 
 export const getLoketByOfficeId = async (
   req: Request,

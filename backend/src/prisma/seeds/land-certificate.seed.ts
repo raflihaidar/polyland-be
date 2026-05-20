@@ -3,11 +3,11 @@ import { PrismaClient } from "@prisma/client/extension";
 import {
   CertificateStatus,
   CertificateType,
-} from "../../generated/prisma/enums";
+} from "../../generated/prisma/enums.js";
 import {
   generateNIB,
   generateUniqueCode,
-} from "../../services/certificate.service";
+} from "../../services/certificate.service.js";
 import "dotenv/config";
 
 export const landCertificateModule = async (prisma: PrismaClient) => {

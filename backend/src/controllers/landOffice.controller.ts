@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
-import * as landOfficeService from "../services/landOffice.service";
-import { AppError } from "../utils/error";
+import * as landOfficeService from "../services/landOffice.service.js";
+import { AppError } from "../utils/error.js";
 
 export const createLandOffice = async (
   req: Request,

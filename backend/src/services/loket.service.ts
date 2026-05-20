@@ -1,5 +1,6 @@
-import { prisma } from "../config/prisma";
-import { AppError } from "../utils/error";
+import { prisma } from "../config/prisma.js";
+import { Loket, Queue } from "../generated/prisma/client.js";
+import { AppError } from "../utils/error.js";
 
 export const getLoket = async (office_id: string) => {
   try {
@@ -47,11 +48,11 @@ export const getLoket = async (office_id: string) => {
       },
     });
 
-    return lokets.map((l) => {
-      const sisa = l.queue.filter((q) => q.status === "MENUNGGU");
+    return lokets.map((l: Loket) => {
+      const sisa = l.queue.filter((q: Queue) => q.status === "MENUNGGU");
 
       const current = l.queue.find(
-        (q) => q.status === "DIPANGGIL" || q.status === "DILAYANI",
+        (q: Queue) => q.status === "DIPANGGIL" || q.status === "DILAYANI",
       );
 
       return {

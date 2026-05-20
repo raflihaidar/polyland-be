@@ -1,6 +1,6 @@
-import * as CertificateService from "../services/certificate.service";
+import * as CertificateService from "../services/certificate.service.js";
 import { NextFunction, Request, Response } from "express";
-import { AppError } from "../utils/error";
+import { AppError } from "../utils/error.js";
 
 export const searchCertificate = async (
   req: Request,

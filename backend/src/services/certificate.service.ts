@@ -1,26 +1,36 @@
-import { prisma } from "../config/prisma";
-import { CertificateCreate } from "../types/domain/certificate.type";
+import { prisma } from "../config/prisma.js";
+import { CertificateCreate } from "../types/domain/certificate.type.js";
 import handlebars from "handlebars";
 import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { formatDateIndonesia, imageToBase64 } from "../utils/parse";
+import { formatDateIndonesia, imageToBase64 } from "../utils/parse.js";
 import {
   CertificateStatus,
   MintingStatus,
   PaymentStatus,
-} from "../generated/prisma/enums";
+} from "../generated/prisma/enums.js";
 import { parseEventLogs } from "viem";
 import QRCode from "qrcode";
 import crypto from "crypto";
 import CryptoJS from "crypto-js";
-import { AppError } from "../utils/error";
-import { findHeadOfficeByLandOffice } from "./officer.service";
-import { toCapitalize } from "../utils/parse";
+import { AppError } from "../utils/error.js";
+import { findHeadOfficeByLandOffice } from "./officer.service.js";
+import { toCapitalize } from "../utils/parse.js";
 import { encrypt } from "eciesjs";
-import { uploadFile } from "./pinata.service";
-import { walletClient, publicClient, contractConfig } from "../config/wallet";
+import { uploadFile } from "./pinata.service.js";
+import {
+  walletClient,
+  publicClient,
+  contractConfig,
+} from "../config/wallet.js";
+import { Prisma } from "@prisma/client/extension";
+import {
+  ApplicationOwner,
+  Certificate,
+  CertificateOwner,
+} from "../generated/prisma/client.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -130,50 +140,52 @@ export const createCertificate = async (payload: CertificateCreate) => {
       notes,
       owners,
     } = payload;
-    const result = await prisma.$transaction(async (tx) => {
-      await tx.certificate.update({
-        where: {
-          code: old_code,
-        },
-        data: {
-          status: CertificateStatus.TIDAK_AKTIF,
-        },
-      });
+    const result = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        await tx.certificate.update({
+          where: {
+            code: old_code,
+          },
+          data: {
+            status: CertificateStatus.TIDAK_AKTIF,
+          },
+        });
 
-      const certificate = await tx.certificate.upsert({
-        where: {
-          application_id,
-        },
-        update: {},
-        create: {
-          code,
-          nib,
-          land_id,
-          application_id,
-          hash,
-          cid,
-          type,
-          notes: {
-            createMany: {
-              data: notes.map((note: string) => ({
-                note,
-              })),
+        const certificate = await tx.certificate.upsert({
+          where: {
+            application_id,
+          },
+          update: {},
+          create: {
+            code,
+            nib,
+            land_id,
+            application_id,
+            hash,
+            cid,
+            type,
+            notes: {
+              createMany: {
+                data: notes.map((note: string) => ({
+                  note,
+                })),
+              },
             },
           },
-        },
-      });
+        });
 
-      await tx.certificateOwner.createMany({
-        data: owners.map((o: any) => ({
-          certificate_id: certificate.id,
-          person_id: o.id,
-          ownership_pct: o.share,
-        })),
-        skipDuplicates: true,
-      });
+        await tx.certificateOwner.createMany({
+          data: owners.map((o: any) => ({
+            certificate_id: certificate.id,
+            person_id: o.id,
+            ownership_pct: o.share,
+          })),
+          skipDuplicates: true,
+        });
 
-      return certificate;
-    });
+        return certificate;
+      },
+    );
     return result;
   } catch (error) {
     console.log("error : ", error);
@@ -431,14 +443,16 @@ export const generateCertificate = async (
     (item) => item.value === application.type,
   );
 
-  const owners = application.owners.map((owner, index) => ({
-    no: index + 1,
-    id: owner.person.id,
-    name: owner.person.name,
-    birthPlace: owner.person.birthPlace,
-    birthDate: formatDateIndonesia(owner.person.birthDate!),
-    share: owner.share,
-  }));
+  const owners = application.owners.map(
+    (owner: ApplicationOwner, index: number) => ({
+      no: index + 1,
+      id: owner.person.id,
+      name: owner.person.name,
+      birthPlace: owner.person.birthPlace,
+      birthDate: formatDateIndonesia(owner.person.birthDate!),
+      share: owner.share,
+    }),
+  );
 
   const noteList = notes.map((n, index) => ({
     no: index + 1,
@@ -508,22 +522,24 @@ export const generateCertificate = async (
       Buffer.from(pdfBuffer),
     );
 
-    const encryptedKeysForOwners = application.owners.map((owner) => {
-      const userPubKey = owner.person.publicKey;
+    const encryptedKeysForOwners = application.owners.map(
+      (owner: ApplicationOwner) => {
+        const userPubKey = owner.person.publicKey;
 
-      if (!userPubKey) {
-        throw new Error(
-          `Owner ${owner.person.name} belum melakukan registrasi kunci publik.`,
-        );
-      }
+        if (!userPubKey) {
+          throw new Error(
+            `Owner ${owner.person.name} belum melakukan registrasi kunci publik.`,
+          );
+        }
 
-      const wrapped = encryptAESKey(aesKey, userPubKey);
+        const wrapped = encryptAESKey(aesKey, userPubKey);
 
-      return {
-        walletAddress: owner.person.wallet_address,
-        encryptedKey: wrapped.encryptedKey,
-      };
-    });
+        return {
+          walletAddress: owner.person.wallet_address,
+          encryptedKey: wrapped.encryptedKey,
+        };
+      },
+    );
 
     aesKey.fill(0);
 
@@ -626,15 +642,15 @@ export const getCertificates = async (person_id: string) => {
       },
     });
 
-    let result = certificates.map((item) => {
+    let result = certificates.map((item: Certificate) => {
       return {
         id: item.id,
-        owners: item.owners.map((owner) => owner.person.name),
+        owners: item.owners.map((owner: CertificateOwner) => owner.person.name),
         nib: item.nib,
         code: item.code,
         type: item.type,
         status: item.status,
-        label : item.label,
+        label: item.label,
         address: {
           province: item.land.province.name,
           regency: item.land.regency.name,
@@ -711,7 +727,7 @@ export const getCertificateById = async (
       status: data.certificate.status,
       cid: data.certificate.cid,
 
-      owners: data.certificate.owners.map((owner) => ({
+      owners: data.certificate.owners.map((owner: CertificateOwner) => ({
         name: owner.person?.name,
         ownership: owner.ownership_pct,
       })),
@@ -764,7 +780,7 @@ export const updatePaymentStatus = async (
 
 export const mintingNft = async (
   certificate_id: string,
-  userAddress: string,
+  userAddress: `0x${string}`,
 ) => {
   try {
     await prisma.certificate.update({
@@ -774,7 +790,9 @@ export const mintingNft = async (
 
     const hash = await walletClient.writeContract({
       ...contractConfig,
+      chain: walletClient.chain,
       functionName: "mintCertificate",
+      account: walletClient.account,
       args: [userAddress],
     });
 
@@ -826,6 +844,7 @@ export const setCertificateCID = async (tokenId: number, cid: string) => {
     const txHash = await walletClient.writeContract({
       ...contractConfig,
       functionName: "setCertificateCID",
+      chain: walletClient.chain,
       args: [BigInt(tokenId), cid],
       account: walletClient.account,
     });
@@ -894,7 +913,7 @@ export const verifyCertificate = async (tokenId: number) => {
       ...contractConfig,
       functionName: "isVerified",
       args: [BigInt(tokenId)],
-    })) as boolean;
+    } as any)) as boolean;
   } catch (error) {
     throw new AppError("Gagal melakukan verifikasi ke blockchain", 502);
   }
@@ -952,12 +971,12 @@ export const verifyCertificate = async (tokenId: number) => {
         regency: certificate.land.regency.name,
         province: certificate.land.province.name,
       },
-      owners: certificate.owners.map((o) => ({
+      owners: certificate.owners.map((o: CertificateOwner) => ({
         name: o.person.name,
         nik: o.person.nik,
         share: o.ownership_pct,
       })),
-      notes: certificate.notes.map((n) => n.note),
+      notes: certificate.notes.map((n: any) => n.note),
     },
   };
 };

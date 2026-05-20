@@ -1,10 +1,11 @@
-import { prisma } from "../config/prisma";
-import { DayOfWeek, Prisma } from "../generated/prisma/client";
+import { prisma } from "../config/prisma.js";
+import { Prisma } from "../generated/prisma/client.js";
+import { DayOfWeek } from "../generated/prisma/enums.js";
 import type {
   CreateLandOfficeInput,
   UpdateLandOfficeInput,
-} from "../types/domain/landOffice.type";
-import { AppError } from "../utils/error";
+} from "../types/domain/landOffice.type.js";
+import { AppError } from "../utils/error.js";
 
 export type LandOfficeResponse = Prisma.LandOfficeGetPayload<{}>;
 

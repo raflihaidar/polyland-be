@@ -1,4 +1,4 @@
-import { CertificateType } from "../../generated/prisma/enums";
+import { CertificateType } from "../../generated/prisma/enums.js";
 
 interface ApplicationOwnerInput {
   person_id: string;

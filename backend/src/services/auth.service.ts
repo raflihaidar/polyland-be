@@ -1,14 +1,19 @@
-import { prisma } from "../config/prisma";
-import type { AuthPerson, RegisterRequest } from "../types/auth.type";
-import { redisClient } from "../config/redis";
-import { generateTokens } from "../utils/jwt";
+import { prisma } from "../config/prisma.js";
+import type { AuthPerson, RegisterRequest } from "../types/auth.type.js";
+import { redisClient } from "../config/redis.js";
+import { generateTokens } from "../utils/jwt.js";
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
 import { verifyMessage, keccak256, toBytes } from "viem";
-import { REFRESH_TOKEN_SECRET, ACCESS_TOKEN_SECRET } from "../config/token";
+import { REFRESH_TOKEN_SECRET, ACCESS_TOKEN_SECRET } from "../config/token.js";
 import jwt from "jsonwebtoken";
-import { AppError } from "../utils/error";
-import { publicClient, walletClient, contractConfig } from "../config/wallet";
+import { AppError } from "../utils/error.js";
+import {
+  publicClient,
+  walletClient,
+  contractConfig,
+} from "../config/wallet.js";
+import { Prisma } from "@prisma/client/extension";
 
 const CITIZEN_ROLE = keccak256(toBytes("CITIZEN_ROLE"));
 const BPN_ROLE = keccak256(toBytes("BPN_ROLE"));
@@ -17,26 +22,28 @@ export const register = async (data: RegisterRequest) => {
   try {
     const hashedPassword = await bcrypt.hash(data.password.trim(), 10);
 
-    const user = await prisma.$transaction(async (tx) => {
-      const user = await tx.person.create({
-        data: {
-          name: data.name,
-          username: data.username,
-          email: data.email,
-          password: hashedPassword,
-          publicKey: data.publicKey,
-        },
-      });
+    const user = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const user = await tx.person.create({
+          data: {
+            name: data.name,
+            username: data.username,
+            email: data.email,
+            password: hashedPassword,
+            publicKey: data.publicKey,
+          },
+        });
 
-      await tx.rolePerson.create({
-        data: {
-          role_id: 6,
-          person_id: user.id,
-        },
-      });
+        await tx.rolePerson.create({
+          data: {
+            role_id: 6,
+            person_id: user.id,
+          },
+        });
 
-      return user;
-    });
+        return user;
+      },
+    );
 
     return user;
   } catch (err: any) {
@@ -99,14 +106,14 @@ export const login = async (email: string) => {
      * FLATTEN PERMISSIONS
      * ==============================
      */
-    const permissions = person.roles.flatMap((rp) =>
+    const permissions = person.roles.flatMap((rp: any) =>
       rp.role.privileges.map(
-        (p) => `${p.privilege.module.slug}:${p.privilege.action}`,
+        (p: any) => `${p.privilege.module.slug}:${p.privilege.action}`,
       ),
     );
 
     // hapus duplicate permission
-    const uniquePermissions = [...new Set(permissions)];
+    const uniquePermissions: any = [...new Set(permissions)];
 
     /**
      * ==============================
@@ -115,7 +122,7 @@ export const login = async (email: string) => {
      */
     const jwtPayload = {
       id: person.id,
-      roles: person.roles.map((rp) => rp.role.name),
+      roles: person.roles.map((rp: any) => rp.role.name),
     };
 
     const { accessToken, refreshToken } = generateTokens(jwtPayload);
@@ -183,7 +190,7 @@ export const getUser = async (id: string) => {
       "notaris/PPAT",
     ];
 
-    const isAdmin = person?.roles.some((rp) =>
+    const isAdmin = person?.roles.some((rp: any) =>
       adminRoles.includes(rp.role.name),
     );
 
@@ -201,7 +208,7 @@ export const getUser = async (id: string) => {
       username: person.username
         ? person.username
         : `user_${id.toString().slice(0, 8)}...`,
-      roles: person.roles.map((rp) => rp.role.name),
+      roles: person.roles.map((rp: any) => rp.role.name),
     };
   } catch (error: unknown) {
     if (error instanceof AppError) {
@@ -283,7 +290,7 @@ export const loginWalletVerify = async (
       ...contractConfig,
       functionName: "hasRole",
       args: [BPN_ROLE, wallet_address],
-    });
+    } as any);
 
     if (isBPN) {
       roleName = "admin kantah";
@@ -301,22 +308,21 @@ export const loginWalletVerify = async (
         },
       });
     } else {
-      const isCitizen = await publicClient.readContract({
-        ...contractConfig,
-        functionName: "hasRole",
-        args: [CITIZEN_ROLE, wallet_address],
-      });
+      // const isCitizen = await publicClient.readContract({
+      //   ...contractConfig,
+      //   functionName: "hasRole",
+      //   args: [CITIZEN_ROLE, wallet_address],
+      // });
 
-      if (!isCitizen) {
-        // Jika belum citizen → assign otomatis
-        const hash = await walletClient.writeContract({
-          ...contractConfig,
-          functionName: "addCitizen",
-          args: [wallet_address],
-        });
+      // if (!isCitizen) {
+      //   const hash = await walletClient.writeContract({
+      //     ...contractConfig,
+      //     functionName: "addCitizen",
+      //     args: [wallet_address],
+      //   });
 
-        await publicClient.waitForTransactionReceipt({ hash });
-      }
+      //   await publicClient.waitForTransactionReceipt({ hash });
+      // }
 
       roleName = person.nik ? "citizen" : "guest";
       const roleId = person.nik ? 6 : 5;

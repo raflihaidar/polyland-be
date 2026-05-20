@@ -1,7 +1,7 @@
 import express from "express";
-import { getMitra } from "../controllers/mitra.controller";
-import { authentication } from "../middlewares/authentication";
-import { authorize } from "../middlewares/authorization";
+import { getMitra } from "../controllers/mitra.controller.js";
+import { authentication } from "../middlewares/authentication.js";
+import { authorize } from "../middlewares/authorization.js";
 
 const router = express.Router();
 

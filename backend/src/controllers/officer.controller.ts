@@ -1,8 +1,11 @@
 import { NextFunction, Request, Response } from "express";
-import * as officerService from "../services/officer.service";
+import * as officerService from "../services/officer.service.js";
 
-
-export const createHeadOffice = async (req: Request, res: Response, next : NextFunction) => {
+export const createHeadOffice = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const result = await officerService.createHeadOfficer(req.body);
 
@@ -12,6 +15,6 @@ export const createHeadOffice = async (req: Request, res: Response, next : NextF
       data: result,
     });
   } catch (error: any) {
-    next(error)
+    next(error);
   }
 };

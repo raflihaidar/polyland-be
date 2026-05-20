@@ -2,9 +2,9 @@ import express from "express";
 import {
   getLoketByOfficeId,
   getQueueByLoketId,
-} from "../controllers/loket.controller";
-import { authentication } from "../middlewares/authentication";
-import { authorize } from "../middlewares/authorization";
+} from "../controllers/loket.controller.js";
+import { authentication } from "../middlewares/authentication.js";
+import { authorize } from "../middlewares/authorization.js";
 
 const router = express.Router();
 

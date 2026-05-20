@@ -3,7 +3,7 @@ export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
-  publicKey: string;
+  publicKey?: string;
 }
 
 export type AuthPerson = {
