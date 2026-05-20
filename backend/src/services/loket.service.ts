@@ -48,12 +48,10 @@ export const getLoket = async (office_id: string) => {
       },
     });
 
-    return lokets.map((l: Loket) => {
+    return lokets.map((l: any) => {
       const sisa = l.queue.filter((q: Queue) => q.status === "MENUNGGU");
 
-      const current = l.queue.find(
-        (q: Queue) => q.status === "DIPANGGIL" || q.status === "DILAYANI",
-      );
+      const current = l.queue.find((q: Queue) => q.status === "DIPANGGIL");
 
       return {
         id: l.id,

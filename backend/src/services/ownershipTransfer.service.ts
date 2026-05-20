@@ -212,7 +212,7 @@ export const getApplication = async (id: string) => {
     return {
       ...application,
       total_fee: Number(application.total_fee),
-      owners: application?.owners.map((o: ApplicationOwner) => {
+      owners: application?.owners.map((o: any) => {
         const { documentIdentity, ...person } = o.person;
 
         return {

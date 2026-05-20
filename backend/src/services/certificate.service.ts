@@ -443,16 +443,14 @@ export const generateCertificate = async (
     (item) => item.value === application.type,
   );
 
-  const owners = application.owners.map(
-    (owner: ApplicationOwner, index: number) => ({
-      no: index + 1,
-      id: owner.person.id,
-      name: owner.person.name,
-      birthPlace: owner.person.birthPlace,
-      birthDate: formatDateIndonesia(owner.person.birthDate!),
-      share: owner.share,
-    }),
-  );
+  const owners = application.owners.map((owner: any, index: number) => ({
+    no: index + 1,
+    id: owner.person.id,
+    name: owner.person.name,
+    birthPlace: owner.person.birthPlace,
+    birthDate: formatDateIndonesia(owner.person.birthDate!),
+    share: owner.share,
+  }));
 
   const noteList = notes.map((n, index) => ({
     no: index + 1,
@@ -486,7 +484,7 @@ export const generateCertificate = async (
     // ─── 2. Mint NFT untuk mendapatkan tokenId ─────────────────────────────
     const tokenId = await mintingNft(
       certificate.id,
-      application.person.wallet_address!,
+      application.person.wallet_address! as `0x${string}`,
     );
 
     // ─── 3. Generate HTML dengan qr_doc yang sudah ada tokenId ─────────────
@@ -522,24 +520,22 @@ export const generateCertificate = async (
       Buffer.from(pdfBuffer),
     );
 
-    const encryptedKeysForOwners = application.owners.map(
-      (owner: ApplicationOwner) => {
-        const userPubKey = owner.person.publicKey;
+    const encryptedKeysForOwners = application.owners.map((owner: any) => {
+      const userPubKey = owner.person.publicKey;
 
-        if (!userPubKey) {
-          throw new Error(
-            `Owner ${owner.person.name} belum melakukan registrasi kunci publik.`,
-          );
-        }
+      if (!userPubKey) {
+        throw new Error(
+          `Owner ${owner.person.name} belum melakukan registrasi kunci publik.`,
+        );
+      }
 
-        const wrapped = encryptAESKey(aesKey, userPubKey);
+      const wrapped = encryptAESKey(aesKey, userPubKey);
 
-        return {
-          walletAddress: owner.person.wallet_address,
-          encryptedKey: wrapped.encryptedKey,
-        };
-      },
-    );
+      return {
+        walletAddress: owner.person.wallet_address,
+        encryptedKey: wrapped.encryptedKey,
+      };
+    });
 
     aesKey.fill(0);
 
@@ -642,10 +638,10 @@ export const getCertificates = async (person_id: string) => {
       },
     });
 
-    let result = certificates.map((item: Certificate) => {
+    let result = certificates.map((item: any) => {
       return {
         id: item.id,
-        owners: item.owners.map((owner: CertificateOwner) => owner.person.name),
+        owners: item.owners.map((owner: any) => owner.person.name),
         nib: item.nib,
         code: item.code,
         type: item.type,
@@ -727,7 +723,7 @@ export const getCertificateById = async (
       status: data.certificate.status,
       cid: data.certificate.cid,
 
-      owners: data.certificate.owners.map((owner: CertificateOwner) => ({
+      owners: data.certificate.owners.map((owner: any) => ({
         name: owner.person?.name,
         ownership: owner.ownership_pct,
       })),
@@ -971,7 +967,7 @@ export const verifyCertificate = async (tokenId: number) => {
         regency: certificate.land.regency.name,
         province: certificate.land.province.name,
       },
-      owners: certificate.owners.map((o: CertificateOwner) => ({
+      owners: certificate.owners.map((o: any) => ({
         name: o.person.name,
         nik: o.person.nik,
         share: o.ownership_pct,

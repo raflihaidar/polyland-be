@@ -96,7 +96,7 @@ export const verify = async (data: VerificationAccountUpdate) => {
           },
         });
 
-        if (person.roles.some((role: Role) => role.role_id === 6)) {
+        if (person.roles.some((role: any) => role.role_id === 6)) {
           await tx.rolePerson.update({
             where: {
               person_id_role_id: {
