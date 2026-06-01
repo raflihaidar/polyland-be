@@ -1,15 +1,3 @@
-/**
- * Auth API — k6 Test Script
- * ─────────────────────────────────────────────
- * Endpoints : POST /api/auth/register
- *             POST /api/auth/login
- *
- * Login: accessToken & refreshToken disimpan di Set-Cookie (bukan JSON body)
- *
- * Run        : k6 run auth.test.js
- * Debug mode : k6 run --env DEBUG=true auth.test.js
- */
-
 import http from "k6/http";
 import { check, sleep, group } from "k6";
 import { Trend, Rate, Counter } from "k6/metrics";
@@ -43,9 +31,9 @@ export const options = {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const BASE_URL = "http://localhost:5000/api/auth";
+const BASE_URL = "http://jejak-tanahku.binatra.id/api/auth";
 const HEADERS = { "Content-Type": "application/json" };
-const DEBUG = __ENV.DEBUG === "true"; // k6 run --env DEBUG=true
+const DEBUG = __ENV.DEBUG === "true";
 
 function log(...args) {
   if (DEBUG || (__VU === 1 && __ITER === 0)) {

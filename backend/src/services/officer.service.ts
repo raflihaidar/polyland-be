@@ -104,11 +104,11 @@ export const createHeadOfficer = async (payload: OfficerCreate) => {
   }
 };
 
-export const findHeadOfficeByLandOffice = async (land_office_id: string) => {
+export const findHeadOfficeByLandOffice = async (land_office_id?: string) => {
   try {
     const headOffice = await prisma.person.findFirst({
       where: {
-        land_office_id,
+        land_office_id: land_office_id ? land_office_id : { not: null },
       },
     });
 

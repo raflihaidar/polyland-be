@@ -26,12 +26,6 @@ import {
   contractConfig,
 } from "../config/wallet.js";
 import { Prisma } from "@prisma/client/extension";
-import {
-  ApplicationOwner,
-  Certificate,
-  CertificateOwner,
-} from "../generated/prisma/client.js";
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

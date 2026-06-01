@@ -18,6 +18,7 @@ import officerRouter from "./routes/officer.route.js";
 import loketRouter from "./routes/loket.route.js";
 import queueRouter from "./routes/queue.route.js";
 import personRouter from "./routes/person.route.js";
+import landRouter from "./routes/land.route.js";
 import healthRouter from "./routes/health.route.js";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler.js";
@@ -41,6 +42,7 @@ app.use(
 
 app.use("/api/auth", authRouter);
 app.use("/api/person", personRouter);
+app.use("/api/land", landRouter);
 app.use("/api/mitra", mitraRouter);
 app.use("/api/verification-account", verifAccountRouter);
 app.use("/api/ownership-transfer", ownershipTFRouter);

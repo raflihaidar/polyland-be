@@ -18,3 +18,24 @@ export const createHeadOffice = async (
     next(error);
   }
 };
+
+export const searchHeadOfficeByOfficeLand = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const result = await officerService.findHeadOfficeByLandOffice(
+      id as string,
+    );
+
+    return res.status(201).json({
+      status: "success",
+      message: "Berhasil mendapatkan data kepala kantah",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

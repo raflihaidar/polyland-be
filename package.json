@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "npx nodemon --exec \"tsx\" backend/src/app.ts",
-    "service": "sudo systemctl start postgresql && sudo systemctl start redis-server"
+    "service": "sudo systemctl start postgresql && sudo systemctl start redis-server",
+    "build": "npx tsc"
   },
   "prisma": {
     "seed": "npx tsx backend/src/prisma/seeds/seed.ts"

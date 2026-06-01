@@ -42,7 +42,6 @@ export const landCertificateModule = async (prisma: PrismaClient) => {
 
   function randomAddress() {
     const namaBunga = bunga[Math.floor(Math.random() * bunga.length)];
-
     return `Jl. ${namaBunga} No. ${faker.number.int({ min: 1, max: 200 })}`;
   }
 
@@ -75,55 +74,70 @@ export const landCertificateModule = async (prisma: PrismaClient) => {
       throw new Error("Village Surabaya / Jember kosong");
     }
 
-    const createLandWithCert = async (villages: any[], total: number) => {
-      for (let i = 0; i < total; i++) {
-        const v = villages[Math.floor(Math.random() * villages.length)];
+    const BATCH_SIZE = 10; // agar tidak overload DB
 
-        console.log(v);
+    const createLandWithCert = async (
+      villages: any[],
+      total: number,
+      label: string,
+    ) => {
+      let created = 0;
 
-        await prisma.land.create({
-          data: {
-            area_size: randomArea(),
-            street_address: randomAddress(),
-            rt: randomRT(),
-            rw: randomRW(),
+      while (created < total) {
+        const batchCount = Math.min(BATCH_SIZE, total - created);
 
-            province_code: Number(v.district.regency.province.code),
-            regency_code: Number(v.district.regency.code),
-            district_code: Number(v.district.code),
-            village_code: String(v.code),
+        await Promise.all(
+          Array.from({ length: batchCount }).map(async () => {
+            const v = villages[Math.floor(Math.random() * villages.length)];
 
-            certificates: {
-              create: {
-                nib: await generateNIB(
-                  Number(v.district.regency.province.code),
-                  Number(v.district.regency.code),
-                  1,
-                ),
-                code: generateUniqueCode(6),
-                type: CertificateType.SHM,
-                status: CertificateStatus.AKTIF,
+            await prisma.land.create({
+              data: {
+                area_size: randomArea(),
+                street_address: randomAddress(),
+                rt: randomRT(),
+                rw: randomRW(),
 
-                owners: {
+                province_code: Number(v.district.regency.province.code),
+                regency_code: Number(v.district.regency.code),
+                district_code: Number(v.district.code),
+                village_code: String(v.code),
+
+                certificates: {
                   create: {
-                    person_id: PERSON_ID,
-                    ownership_pct: 1,
+                    nib: await generateNIB(
+                      Number(v.district.regency.province.code),
+                      Number(v.district.regency.code),
+                      1,
+                    ),
+                    code: generateUniqueCode(6),
+                    type: CertificateType.SHM,
+                    status: CertificateStatus.AKTIF,
+
+                    owners: {
+                      create: {
+                        person_id: PERSON_ID,
+                        ownership_pct: 1,
+                      },
+                    },
                   },
                 },
               },
-            },
-          },
-        });
+            });
+          }),
+        );
+
+        created += batchCount;
+        console.log(`⏳ ${label}: ${created}/${total} selesai`);
       }
     };
 
-    await createLandWithCert(surabayaVillages, 20);
-    console.log("✅ Surabaya done");
+    await createLandWithCert(surabayaVillages, 150, "Surabaya");
+    console.log("✅ Surabaya done (150 certificates)");
 
-    await createLandWithCert(jemberVillages, 20);
-    console.log("✅ Jember done");
+    await createLandWithCert(jemberVillages, 150, "Jember");
+    console.log("✅ Jember done (150 certificates)");
 
-    console.log("🎉 Seed land + certificate selesai");
+    console.log("🎉 Seed land + certificate selesai — total 300 data");
   } catch (err) {
     console.error("❌ Error seed land:", err);
   }

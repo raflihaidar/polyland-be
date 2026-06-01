@@ -4,6 +4,50 @@ import { AppError } from "../utils/error.js";
 
 type DBClient = Prisma.TransactionClient | typeof prisma;
 
+export const getAllLand = async () => {
+  try {
+    const lands = await prisma.land.findMany({
+      include: {
+        certificates: {
+          include: {
+            owners: true,
+          },
+        },
+      },
+    });
+
+    if (!lands) {
+      throw new AppError("Data tanah tidak ditemukan", 400);
+    }
+
+    return lands;
+  } catch (error: any) {
+    throw new AppError(
+      "Terjadi kesalahan saat memuat data tanah",
+      500,
+      error?.message,
+    );
+  }
+};
+
+export const findById = async (db: DBClient = prisma, id: string) => {
+  try {
+    const land = await db.land.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    return land;
+  } catch (error: any) {
+    throw new AppError(
+      "Terjadi kesalahan saat mencari data tanah",
+      500,
+      error?.message,
+    );
+  }
+};
+
 // export const create = async (db: DBClient = prisma, data: any) => {
 //   try {
 //     const land = await db.land.create({
@@ -38,21 +82,3 @@ type DBClient = Prisma.TransactionClient | typeof prisma;
 //     );
 //   }
 // };
-
-export const findById = async (db: DBClient = prisma, id: string) => {
-  try {
-    const land = await db.land.findUnique({
-      where: {
-        id,
-      },
-    });
-
-    return land;
-  } catch (error: any) {
-    throw new AppError(
-      "Terjadi kesalahan saat mencari data tanah",
-      500,
-      error?.message,
-    );
-  }
-};
