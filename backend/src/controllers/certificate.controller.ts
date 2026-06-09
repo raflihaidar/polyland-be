@@ -1,4 +1,5 @@
 import * as CertificateService from "../services/certificate.service.js";
+import { verifyCertificate as verifyMock } from "../services/verifyCertMock.service.js";
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/error.js";
 
@@ -161,5 +162,41 @@ export const updateLabelCertificate = async (
     });
   } catch (error: any) {
     next(error);
+  }
+};
+
+export const verifyCertMock = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const certCode = req.params.certCode as string;
+
+    if (!certCode || certCode.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "certCode tidak valid",
+      });
+    }
+
+    const result = await verifyMock(certCode);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Terjadi kesalahan server",
+    });
   }
 };

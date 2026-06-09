@@ -1,5 +1,5 @@
 import { prisma } from "../config/prisma.js";
-import { ApplicationOwner, Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "../generated/prisma/client.js";
 import { AppError } from "../utils/error.js";
 import {
   ApplicationCreate,

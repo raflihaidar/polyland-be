@@ -6,12 +6,14 @@ import {
   verifyCertificate,
   searchCertificate,
   updateLabelCertificate,
+  verifyCertMock,
 } from "../controllers/certificate.controller.js";
 import { authentication } from "../middlewares/authentication.js";
 import { authorize } from "../middlewares/authorization.js";
 
 const router = express.Router();
 
+router.get("/verify-mock/:certCode", verifyCertMock);
 router.get("/verify/:tokenId", verifyCertificate);
 router.use(authentication);
 

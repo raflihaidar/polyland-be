@@ -20,6 +20,7 @@ import queueRouter from "./routes/queue.route.js";
 import personRouter from "./routes/person.route.js";
 import landRouter from "./routes/land.route.js";
 import healthRouter from "./routes/health.route.js";
+import workerResultRouter from "./routes/worker.route.js";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import path from "path";
@@ -40,6 +41,7 @@ app.use(
   }),
 );
 
+// ─── Daftarkan di app.js / index.js kamu ─────────────────────────────────────
 app.use("/api/auth", authRouter);
 app.use("/api/person", personRouter);
 app.use("/api/land", landRouter);
@@ -53,7 +55,7 @@ app.use("/api/loket", loketRouter);
 app.use("/api/queue", queueRouter);
 app.use("/api/health", healthRouter);
 app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
-
+app.use("/api/worker-result", workerResultRouter);
 app.use(errorHandler);
 
 const pinata = new PinataSDK({

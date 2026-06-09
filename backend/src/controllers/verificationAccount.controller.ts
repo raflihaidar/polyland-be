@@ -1,6 +1,7 @@
 import * as VerifService from "../services/verificationAccount.service.js";
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/error.js";
+import { VerificationStatus } from "../generated/prisma/enums.js";
 
 export const check = async (
   req: Request,
@@ -17,10 +18,37 @@ export const check = async (
       data: isExisting,
     });
   } catch (error) {
-    next();
+    next(error);
   }
 };
 
+export const getAllAccount = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { status, search, page, limit } = req.query;
+
+    const pageNumber = Number(page) || 1;
+    const limitNumber = Number(limit) || 10;
+
+    const result = await VerifService.findAllAccount(
+      pageNumber,
+      limitNumber,
+      search as string,
+      status as VerificationStatus,
+    );
+
+    res.status(200).json({
+      message: "Daftar akun berhasil didapatkan",
+      data: result,
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+};
 export const submit = async (
   req: Request,
   res: Response,

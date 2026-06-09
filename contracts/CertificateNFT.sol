@@ -10,6 +10,8 @@ contract CertificateNFT is ERC721, AccessControl {
 
     bytes32 public constant BPN_ROLE = keccak256("BPN_ROLE");
 
+    bool private _bpnTransferInProgress;
+
     struct OwnershipRecord {
         address owner;
         uint256 timestamp;
@@ -92,7 +94,11 @@ contract CertificateNFT is ERC721, AccessControl {
 
         address currentOwner = ownerOf(tokenId);
 
+        _bpnTransferInProgress = true;
+
         _transfer(currentOwner, newOwner, tokenId);
+
+        _bpnTransferInProgress = false;
 
         _certificateCID[tokenId] = newCid;
 
@@ -126,7 +132,11 @@ contract CertificateNFT is ERC721, AccessControl {
     {
         address from = _ownerOf(tokenId);
 
-        if (from != address(0) && to != address(0)) {
+        if (
+            from != address(0) &&
+            to != address(0) &&
+            !_bpnTransferInProgress
+        ) {
             revert("Direct transfer not allowed");
         }
 

@@ -5,8 +5,7 @@ import {
   VerificationAccountUpdate,
 } from "../types/domain/verificationAccount.type.js";
 import { VerificationStatus } from "../generated/prisma/enums.js";
-import { Prisma } from "@prisma/client/extension";
-import { Role } from "../generated/prisma/client.js";
+import { Prisma } from "../generated/prisma/client.js";
 
 export const isVerified = async (person_id: string) => {
   try {
@@ -25,6 +24,65 @@ export const isVerified = async (person_id: string) => {
       500,
       err.meta,
     );
+  }
+};
+
+export const findAllAccount = async (
+  page = 1,
+  limit = 10,
+  search?: string,
+  status?: VerificationStatus,
+) => {
+  try {
+    console.log("page : ", page);
+    console.log("limit : ", limit);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.AccountVerificationWhereInput = {
+      ...(status && { status: status as VerificationStatus }),
+      ...(search && {
+        OR: [
+          {
+            fullName: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+          {
+            phone: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        ],
+      }),
+    };
+    const [data, total] = await Promise.all([
+      await prisma.accountVerification.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+      prisma.accountVerification.count({ where }),
+    ]);
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  } catch (err: any) {
+    console.log(err);
+    if (err instanceof AppError) {
+      throw err;
+    }
+    throw new AppError("Gagal mendapatkan daftar akun", 500, err.meta);
   }
 };
 
@@ -47,7 +105,6 @@ export const submit = async (data: VerificationAccountCreate) => {
 
     return verificationAccount;
   } catch (err: any) {
-    console.log(err);
     if (err instanceof AppError) {
       throw err;
     }

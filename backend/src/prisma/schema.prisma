@@ -12,6 +12,7 @@ enum CertificateStatus {
   DALAM_PROSES
   BERMASALAH
   TIDAK_AKTIF
+  TERJADI_KESALAHAN
 }
 
 enum ApplicationStatus {
@@ -20,6 +21,7 @@ enum ApplicationStatus {
   PENANDATANGANAN
   DITOLAK
   SELESAI
+  TERJADI_KESALAHAN
 }
 
 enum Section {

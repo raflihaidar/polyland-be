@@ -170,6 +170,7 @@ export const getUser = async (id: string) => {
     const person = await prisma.person.findUnique({
       where: { id },
       select: {
+        id: true,
         name: true,
         username: true,
         email: true,
@@ -258,15 +259,12 @@ export const loginWalletVerify = async (
   signature: `0x${string}`,
 ) => {
   try {
-    console.log("wallet address : ", wallet_address);
     const person = await prisma.person.findUnique({
       where: { wallet_address },
       include: {
         roles: { include: { role: true } },
       },
     });
-
-    console.log("person : ", person);
 
     if (!person) {
       throw new AppError("Data tidak ditemukan", 404);
