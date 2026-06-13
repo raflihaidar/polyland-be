@@ -42,7 +42,7 @@ export const getAllAccount = async (
 
     res.status(200).json({
       message: "Daftar akun berhasil didapatkan",
-      data: result,
+      data : result,
     });
   } catch (error) {
     console.log(error);

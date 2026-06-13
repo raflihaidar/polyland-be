@@ -19,6 +19,7 @@ import loketRouter from "./routes/loket.route.js";
 import queueRouter from "./routes/queue.route.js";
 import personRouter from "./routes/person.route.js";
 import landRouter from "./routes/land.route.js";
+import referenceDataRouter from "./routes/referenceData.route.js"
 import healthRouter from "./routes/health.route.js";
 import workerResultRouter from "./routes/worker.route.js";
 import cookieParser from "cookie-parser";
@@ -53,6 +54,7 @@ app.use("/api/certificate", certificateRoute);
 app.use("/api/officer", officerRouter);
 app.use("/api/loket", loketRouter);
 app.use("/api/queue", queueRouter);
+app.use("/api/reference", referenceDataRouter);
 app.use("/api/health", healthRouter);
 app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
 app.use("/api/worker-result", workerResultRouter);

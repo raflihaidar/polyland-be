@@ -34,8 +34,6 @@ export const findAllAccount = async (
   status?: VerificationStatus,
 ) => {
   try {
-    console.log("page : ", page);
-    console.log("limit : ", limit);
     const skip = (page - 1) * limit;
 
     const where: Prisma.AccountVerificationWhereInput = {
@@ -69,7 +67,7 @@ export const findAllAccount = async (
       prisma.accountVerification.count({ where }),
     ]);
     return {
-      data,
+      account : data,
       meta: {
         page,
         limit,
