@@ -114,9 +114,11 @@ model Person {
   publicKey  String? @db.Text
   privateKey String? @db.Text
 
-  nonce     String?  @db.VarChar(100)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  nonce String? @db.VarChar(100)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   accountVerifications AccountVerification[]
   verifiedAccounts     AccountVerification[] @relation("VerificationApprover")
@@ -464,24 +466,21 @@ model FileCounter {
 }
 
 model Module {
-  id          Int          @id @default(autoincrement())
-  name        String       @db.VarChar(50)
-  slug        String       @unique @db.VarChar(50)
+  id          Int         @id @default(autoincrement())
+  name        String      @db.VarChar(50)
+  slug        String      @unique @db.VarChar(50)
   description String?
   section     String?
   privileges  Privilege[]
-  groupId     Int?         @map("group_id")
-  moduleGroup ModuleGroup? @relation(fields: [groupId], references: [id])
 
   @@map("modules")
 }
 
 model ModuleGroup {
-  id      Int      @id @default(autoincrement())
-  name    String   @unique @db.VarChar(50)
-  slug    String   @unique @db.VarChar(100)
+  id      Int     @id @default(autoincrement())
+  name    String  @unique @db.VarChar(50)
+  slug    String  @unique @db.VarChar(100)
   section Section
-  modules Module[]
 
   @@map("module_groups")
 }

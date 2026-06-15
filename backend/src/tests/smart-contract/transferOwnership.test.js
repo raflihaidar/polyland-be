@@ -39,7 +39,7 @@ describe("transferOwnershipByBPN di Amoy", () => {
       abi,
       functionName: "transferOwnershipByBPN",
       args: [
-        2,
+        3,
         newOwner,
         "bafkreicaaw7kyaf275kpztvcvmwzk3dvliqhacrhexnioygfoa7btoat3q",
       ],

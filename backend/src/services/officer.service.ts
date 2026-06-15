@@ -52,54 +52,63 @@ export const createHeadOfficer = async (payload: OfficerCreate) => {
       land_office_id,
     } = payload;
 
+    const role = await prisma.role.findFirst({
+      where: { name: "kepala kantah" },
+    });
+
+    if (!role) throw new AppError("Role kepala kantah tidak ditemukan", 404);
+
     const { publicKey, privateKey } = generateSignatureKeyPair();
-
     const encryptedPrivateKey = encryptPrivateKey(privateKey as string);
-
     const hashedPassword = await bcrypt.hash(password.trim(), 10);
 
-    const headOfficer = await prisma.person.create({
-      data: {
-        name,
-        username,
-        password: hashedPassword,
-        email,
-        birthDate,
-        birthPlace,
-        phone,
-        gender,
-        address,
-        nip,
-        nik,
-        publicKey,
-        privateKey: encryptedPrivateKey,
-        isVerified: true,
-        verifiedAt: new Date(),
-        land_office_id,
-      },
-    });
+    await prisma.$transaction(async (tx) => {
+      const headOfficer = await tx.person.create({
+        data: {
+          name,
+          username,
+          password: hashedPassword,
+          email,
+          birthDate,
+          birthPlace,
+          phone,
+          gender,
+          address,
+          nip,
+          nik,
+          publicKey,
+          privateKey: encryptedPrivateKey,
+          isVerified: true,
+          verifiedAt: new Date(),
+          land_office_id,
+        },
+      });
 
-    await prisma.accountVerification.create({
-      data: {
-        person_id: headOfficer.id,
-        fullName: name!,
-        nik: nik!,
-        phone: phone!,
-        birthPlace: birthPlace!,
-        birthDate: birthDate!,
-        gender: gender!,
-        address: address!,
-        status: VerificationStatus.APPROVED,
-      },
-    });
+      await tx.accountVerification.create({
+        data: {
+          person_id: headOfficer.id,
+          fullName: name!,
+          nik: nik!,
+          phone: phone!,
+          birthPlace: birthPlace!,
+          birthDate: birthDate!,
+          gender: gender!,
+          address: address!,
+          status: VerificationStatus.APPROVED,
+        },
+      });
 
-    await prisma.rolePerson.create({
-      data: {
-        role_id: 2,
-        person_id: headOfficer.id,
-      },
+      const result = await tx.rolePerson.create({
+        data: {
+          role_id: role.id,
+          person_id: headOfficer.id,
+        },
+      });
+
+      console.log(result);
     });
   } catch (error: any) {
+    if (error instanceof AppError) throw error;
     throw new AppError("Gagal menambahkan kepala kantah", 500, error.meta);
   }
 };

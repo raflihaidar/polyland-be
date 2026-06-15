@@ -37,7 +37,7 @@ describe("setCertificateCID di Amoy", () => {
       address: CONTRACT_ADDRESS,
       abi,
       functionName: "setCertificateCID",
-      args: [2, "bafybeic2e2hgrwnnh6mxaxswcltisrnwai3brpjlgozmwffowgikx53p7m"],
+      args: [3, "bafybeic2e2hgrwnnh6mxaxswcltisrnwai3brpjlgozmwffowgikx53p7m"],
     });
     const sendTime = ((performance.now() - startSend) / 1000).toFixed(2);
 

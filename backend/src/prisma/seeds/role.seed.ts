@@ -7,10 +7,11 @@ export const seedRoles = async (prisma: PrismaClient) => {
   // );
   const roles = await prisma.role.createMany({
     data: [
-      { name: "admin kantah" },
+      { name: "admin aplikasi" },
+      { name: "kepala kanwil" },
+      { name: "admin kanwil" },
       { name: "kepala kantah" },
-      { name: "registration officer" },
-      { name: "notaris/PPAT" },
+      { name: "admin kantah" },
       { name: "citizen" },
       { name: "guest" },
     ],

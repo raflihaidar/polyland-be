@@ -67,7 +67,7 @@ export const findAllAccount = async (
       prisma.accountVerification.count({ where }),
     ]);
     return {
-      account : data,
+      account: data,
       meta: {
         page,
         limit,
@@ -112,10 +112,18 @@ export const submit = async (data: VerificationAccountCreate) => {
 
 export const verify = async (data: VerificationAccountUpdate) => {
   try {
+    // Ambil role guest dan citizen dari DB
+    const [guestRole, citizenRole] = await Promise.all([
+      prisma.role.findFirst({ where: { name: "guest" } }),
+      prisma.role.findFirst({ where: { name: "citizen" } }),
+    ]);
+
+    if (!guestRole || !citizenRole) {
+      throw new AppError("Konfigurasi role tidak lengkap", 500);
+    }
+
     const verificationAccount = await prisma.accountVerification.update({
-      where: {
-        id: data.id,
-      },
+      where: { id: data.id },
       data: {
         status: data.status,
         rejectionReason: data.rejectionReason ?? null,
@@ -124,12 +132,11 @@ export const verify = async (data: VerificationAccountUpdate) => {
 
     const isApproved =
       verificationAccount.status === VerificationStatus.APPROVED;
+
     if (verificationAccount && isApproved) {
       return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const person = await tx.person.update({
-          where: {
-            id: verificationAccount.person_id,
-          },
+          where: { id: verificationAccount.person_id },
           data: {
             name: verificationAccount.fullName,
             username: verificationAccount.fullName
@@ -146,22 +153,23 @@ export const verify = async (data: VerificationAccountUpdate) => {
             publicKey: verificationAccount.publicKey,
             wallet_address: verificationAccount.wallet_address,
           },
-          include: {
-            roles: true,
-          },
+          include: { roles: true },
         });
 
-        if (person.roles.some((role: any) => role.role_id === 6)) {
+        // Kalau punya role guest, upgrade ke citizen
+        const hasGuestRole = person.roles.some(
+          (r: any) => r.role_id === guestRole.id,
+        );
+
+        if (hasGuestRole) {
           await tx.rolePerson.update({
             where: {
               person_id_role_id: {
                 person_id: verificationAccount.person_id,
-                role_id: 6,
+                role_id: guestRole.id,
               },
             },
-            data: {
-              role_id: 5,
-            },
+            data: { role_id: citizenRole.id },
           });
         }
       });
@@ -169,7 +177,7 @@ export const verify = async (data: VerificationAccountUpdate) => {
 
     return verificationAccount;
   } catch (err: any) {
-    console.log(err);
+    if (err instanceof AppError) throw err;
     throw new AppError("Gagal melakukan verifikasi akun", 500, err.meta);
   }
 };

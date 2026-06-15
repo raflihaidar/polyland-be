@@ -25,7 +25,7 @@ describe("isVerified di Amoy", () => {
       address: CONTRACT_ADDRESS,
       abi,
       functionName: "isVerified",
-      args: [2n],
+      args: [4n],
     });
 
     const duration = performance.now() - start;

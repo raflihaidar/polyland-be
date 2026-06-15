@@ -17,13 +17,17 @@ router.get("/verify-mock/:certCode", verifyCertMock);
 router.get("/verify/:tokenId", verifyCertificate);
 router.use(authentication);
 
-router.get("/", getCertificates);
-router.get("/search", searchCertificate);
-router.get("/:certificateId", getDetailCertificate);
-router.put("/:id", updateLabelCertificate);
+router.get("/", authorize("sertipikatku", "read"), getCertificates);
+router.get("/search", authorize("sertipikatku", "read"), searchCertificate);
+router.get(
+  "/:certificateId",
+  authorize("sertipikatku", "read"),
+  getDetailCertificate,
+);
+router.put("/:id", authorize("sertipikatku", "update"), updateLabelCertificate);
 router.post(
   "/generate",
-  authorize("verifikasi-akun", "read"),
+  authorize("sertipikatku", "create"),
   generateCertificate,
 );
 

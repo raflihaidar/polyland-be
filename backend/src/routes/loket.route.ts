@@ -10,7 +10,7 @@ const router = express.Router();
 
 router.use(authentication);
 
-router.get("/", getLoketByOfficeId);
-router.get("/queues/:id", getQueueByLoketId);
+router.get("/", authorize("loket", "read"), getLoketByOfficeId);
+router.get("/queues/:id", authorize("loket", "read"), getQueueByLoketId);
 
 export default router;

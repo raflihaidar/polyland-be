@@ -25,7 +25,7 @@ describe("getOwnershipHistory di Amoy", () => {
       address: CONTRACT_ADDRESS,
       abi,
       functionName: "getOwnershipHistory",
-      args: [2n],
+      args: [3n],
     });
 
     const responseTime = performance.now() - start;

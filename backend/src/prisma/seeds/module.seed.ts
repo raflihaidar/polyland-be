@@ -18,21 +18,21 @@ export const seedModules = async (prisma: PrismaClient) => {
     // Dashboard
     { name: "Dashboard", slug: "dashboard", section: "DASHBOARD" },
 
-    // { name: "Swaploting", slug: "swaploting", section: "Layanan" },
+    { name: "Antrian Online", slug: "antrian-online", section: "Layanan" },
     { name: "Cari Berkas", slug: "cari-berkas", section: "Layanan" },
     { name: "Peralihan Hak", slug: "peralihan-hak", section: "Layanan" },
-    { name: "Mitra Kerja", slug: "mitra-kerja", section: "Layanan" },
     { name: "Sertipikatku", slug: "sertipikatku", section: "Layanan" },
-    { name: "Aktaku", slug: "aktaku", section: "Layanan" },
-    { name: "Berkasku", slug: "berkasku", section: "Layanan" },
-    {name : "Kantah", slug : "kantah", section : "Management"},
-
-    {name : "Verifikasi Akun", slug : "verifikasi-akun", section : "Authentikasi"},
+    { name: "Kantah", slug: "kantah", section: "Management" },
+    {
+      name: "Verifikasi Akun",
+      slug: "verifikasi-akun",
+      section: "Authentikasi",
+    },
 
     // Setting
     { name: "User", slug: "user", section: "SETTING" },
     { name: "Role", slug: "role", section: "SETTING" },
-    { name: "Role Privilege", slug: "role-privilege", section: "SETTING" },
+    { name: "Privilege", slug: "privilege", section: "SETTING" },
   ];
 
   await prisma.module.createMany({

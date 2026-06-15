@@ -34,9 +34,15 @@ export const register = async (data: RegisterRequest) => {
           },
         });
 
+        const role = await tx.role.findFirst({
+          where: {
+            name: "guest",
+          },
+        });
+
         await tx.rolePerson.create({
           data: {
-            role_id: 6,
+            role_id: role.id,
             person_id: user.id,
           },
         });
@@ -282,6 +288,17 @@ export const loginWalletVerify = async (
       throw new AppError("Signature tidak valid, silahkan coba lagi", 403);
     }
 
+    // Ambil semua role yang dibutuhkan sekaligus
+    const [bpnRole, citizenRole, guestRole] = await Promise.all([
+      prisma.role.findFirst({ where: { name: "admin kantah" } }),
+      prisma.role.findFirst({ where: { name: "citizen" } }),
+      prisma.role.findFirst({ where: { name: "guest" } }),
+    ]);
+
+    if (!bpnRole || !citizenRole || !guestRole) {
+      throw new AppError("Konfigurasi role tidak lengkap", 500);
+    }
+
     let roleName: string = "guest";
 
     const isBPN = await publicClient.readContract({
@@ -291,61 +308,45 @@ export const loginWalletVerify = async (
     } as any);
 
     if (isBPN) {
-      roleName = "admin kantah";
+      roleName = bpnRole.name;
+
       await prisma.rolePerson.upsert({
         where: {
           person_id_role_id: {
             person_id: person.id,
-            role_id: 2,
+            role_id: bpnRole.id,
           },
         },
         update: {},
         create: {
           person_id: person.id,
-          role_id: 2,
+          role_id: bpnRole.id,
         },
       });
     } else {
-      // const isCitizen = await publicClient.readContract({
-      //   ...contractConfig,
-      //   functionName: "hasRole",
-      //   args: [CITIZEN_ROLE, wallet_address],
-      // });
-
-      // if (!isCitizen) {
-      //   const hash = await walletClient.writeContract({
-      //     ...contractConfig,
-      //     functionName: "addCitizen",
-      //     args: [wallet_address],
-      //   });
-
-      //   await publicClient.waitForTransactionReceipt({ hash });
-      // }
-
-      roleName = person.nik ? "citizen" : "guest";
-      const roleId = person.nik ? 6 : 5;
+      const assignedRole = person.nik ? citizenRole : guestRole;
+      const removedRole = bpnRole; // hapus role BPN kalau ada
+      roleName = assignedRole.name;
 
       await prisma.$transaction([
         prisma.rolePerson.upsert({
           where: {
             person_id_role_id: {
               person_id: person.id,
-              role_id: roleId,
+              role_id: assignedRole.id,
             },
           },
           update: {},
           create: {
             person_id: person.id,
-            role_id: 2,
+            role_id: assignedRole.id,
           },
         }),
 
-        prisma.rolePerson.delete({
+        prisma.rolePerson.deleteMany({
           where: {
-            person_id_role_id: {
-              person_id: person.id,
-              role_id: 2,
-            },
+            person_id: person.id,
+            role_id: removedRole.id,
           },
         }),
       ]);
@@ -362,15 +363,9 @@ export const loginWalletVerify = async (
       EX: 60 * 60 * 24 * 7,
     });
 
-    return {
-      accessToken,
-      refreshToken,
-    };
+    return { accessToken, refreshToken };
   } catch (error: unknown) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-
+    if (error instanceof AppError) throw error;
     throw new AppError("Gagal login dengan wallet, silahkan coba lagi", 500);
   }
 };
