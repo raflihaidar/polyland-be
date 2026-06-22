@@ -112,72 +112,192 @@ export const submit = async (data: VerificationAccountCreate) => {
 
 export const verify = async (data: VerificationAccountUpdate) => {
   try {
-    // Ambil role guest dan citizen dari DB
+    const isRejected = false;
     const [guestRole, citizenRole] = await Promise.all([
-      prisma.role.findFirst({ where: { name: "guest" } }),
-      prisma.role.findFirst({ where: { name: "citizen" } }),
+      prisma.role.findFirst({
+        where: { name: "guest" },
+      }),
+      prisma.role.findFirst({
+        where: { name: "citizen" },
+      }),
     ]);
 
     if (!guestRole || !citizenRole) {
       throw new AppError("Konfigurasi role tidak lengkap", 500);
     }
 
-    const verificationAccount = await prisma.accountVerification.update({
-      where: { id: data.id },
-      data: {
-        status: data.status,
-        rejectionReason: data.rejectionReason ?? null,
+    const verificationAccount = await prisma.accountVerification.findUnique({
+      where: {
+        id: data.id,
       },
     });
 
-    const isApproved =
-      verificationAccount.status === VerificationStatus.APPROVED;
+    if (!verificationAccount) {
+      throw new AppError("Data verifikasi tidak ditemukan", 404);
+    }
 
-    if (verificationAccount && isApproved) {
-      return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        const person = await tx.person.update({
-          where: { id: verificationAccount.person_id },
-          data: {
-            name: verificationAccount.fullName,
-            username: verificationAccount.fullName
-              .toLowerCase()
-              .replace(/\s+/g, ""),
-            nik: verificationAccount.nik,
-            phone: verificationAccount.phone,
-            birthDate: verificationAccount.birthDate,
-            birthPlace: verificationAccount.birthPlace,
-            gender: verificationAccount.gender,
-            address: verificationAccount.address,
-            isVerified: isApproved,
-            verifiedAt: verificationAccount.updatedAt,
-            publicKey: verificationAccount.publicKey,
-            wallet_address: verificationAccount.wallet_address,
-          },
-          include: { roles: true },
-        });
+    const isApproved = data.status === VerificationStatus.APPROVED;
 
-        // Kalau punya role guest, upgrade ke citizen
-        const hasGuestRole = person.roles.some(
-          (r: any) => r.role_id === guestRole.id,
-        );
-
-        if (hasGuestRole) {
-          await tx.rolePerson.update({
-            where: {
-              person_id_role_id: {
-                person_id: verificationAccount.person_id,
-                role_id: guestRole.id,
-              },
-            },
-            data: { role_id: citizenRole.id },
-          });
-        }
+    if (!isApproved) {
+      return prisma.accountVerification.update({
+        where: {
+          id: data.id,
+        },
+        data: {
+          status: data.status,
+          rejectionReason: data.rejectionReason ?? null,
+        },
       });
+    }
+
+    return await prisma.$transaction(async (tx) => {
+      const existingPerson = await tx.person.findFirst({
+        where: {
+          id: {
+            not: verificationAccount.person_id,
+          },
+          OR: [
+            {
+              nik: verificationAccount.nik,
+            },
+            {
+              wallet_address: verificationAccount.wallet_address,
+            },
+            {
+              publicKey: verificationAccount.publicKey,
+            },
+          ],
+        },
+      });
+
+      if (existingPerson?.name === verificationAccount.fullName) {
+        throw new AppError("nama sudah digunakan oleh akun lain", 400);
+      }
+
+      if (existingPerson?.nik === verificationAccount.nik) {
+        throw new AppError("NIK sudah digunakan oleh akun lain", 400);
+      }
+
+      if (
+        existingPerson?.wallet_address === verificationAccount.wallet_address
+      ) {
+        throw new AppError(
+          "Wallet address sudah digunakan oleh akun lain",
+          400,
+        );
+      }
+
+      if (existingPerson?.publicKey === verificationAccount.publicKey) {
+        throw new AppError("Public key sudah digunakan oleh akun lain", 400);
+      }
+
+      if (isRejected) {
+        tx.accountVerification.update({
+          where: {
+            id: data.id,
+          },
+          data: {
+            status: "REJECTED",
+            rejectionReason: data.rejectionReason ?? null,
+          },
+        });
+      }
+
+      const updatedVerification = await tx.accountVerification.update({
+        where: {
+          id: data.id,
+        },
+        data: {
+          status: data.status,
+          rejectionReason: data.rejectionReason ?? null,
+        },
+      });
+
+      const person = await tx.person.update({
+        where: {
+          id: verificationAccount.person_id,
+        },
+        data: {
+          name: verificationAccount.fullName,
+          username: verificationAccount.fullName
+            .toLowerCase()
+            .replace(/\s+/g, ""),
+          nik: verificationAccount.nik,
+          phone: verificationAccount.phone,
+          birthDate: verificationAccount.birthDate,
+          birthPlace: verificationAccount.birthPlace,
+          gender: verificationAccount.gender,
+          address: verificationAccount.address,
+          isVerified: true,
+          verifiedAt: updatedVerification.updatedAt,
+          publicKey: verificationAccount.publicKey,
+          wallet_address: verificationAccount.wallet_address,
+        },
+        include: {
+          roles: true,
+        },
+      });
+
+      const hasGuestRole = person.roles.some(
+        (role) => role.role_id === guestRole.id,
+      );
+
+      if (hasGuestRole) {
+        await tx.rolePerson.update({
+          where: {
+            person_id_role_id: {
+              person_id: person.id,
+              role_id: guestRole.id,
+            },
+          },
+          data: {
+            role_id: citizenRole.id,
+          },
+        });
+      }
+
+      return {
+        verificationAccount: updatedVerification,
+        person,
+      };
+    });
+  } catch (err: any) {
+    if (err instanceof AppError) {
+      throw err;
+    }
+
+    throw new AppError("Gagal melakukan verifikasi akun", 500, err?.meta);
+  }
+};
+
+export const findAccountByPersonId = async (person_id: string) => {
+  try {
+    const verificationAccount = await prisma.accountVerification.findFirst({
+      where: {
+        person_id,
+      },
+      select: {
+        fullName: true,
+        nik: true,
+        phone: true,
+        birthDate: true,
+        birthPlace: true,
+        address: true,
+        publicKey: true,
+        rejectionReason: true,
+      },
+    });
+
+    if (!verificationAccount) {
+      throw new AppError("Data verifikasi akun tidak ditemukan", 200);
     }
 
     return verificationAccount;
   } catch (err: any) {
-    if (err instanceof AppError) throw err;
-    throw new AppError("Gagal melakukan verifikasi akun", 500, err.meta);
+    if (err instanceof AppError) {
+      throw err;
+    }
+
+    throw new AppError("Gagal mendapatkan data akun", 500, err?.meta);
   }
 };

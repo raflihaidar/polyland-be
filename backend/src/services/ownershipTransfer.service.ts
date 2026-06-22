@@ -289,100 +289,102 @@ export const submitApplication = async (
   tempFolder: string,
 ) => {
   try {
-    const result = await prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        const year = new Date().getFullYear().toString().slice(-2);
+    const result = await prisma.$transaction(async (tx: any) => {
+      const year = new Date().getFullYear().toString().slice(-2);
 
-        const lastNumber = await fileCounterService.increment(tx);
+      const lastNumber = await fileCounterService.increment(tx);
 
-        const land = await landService.findById(tx, data.land_id);
+      const land = await landService.findById(tx, data.land_id);
 
-        const landOffice = await tx.landOffice.findFirst({
-          where: { id: data.land_office_id },
-          include: { price: true },
-        });
+      const landOffice = await tx.landOffice.findFirst({
+        where: { id: data.land_office_id },
+        include: { price: true },
+      });
 
-        if (!landOffice?.price) {
-          throw new AppError("Harga tanah kantor belum diatur", 400);
-        }
+      if (!landOffice?.price) {
+        throw new AppError("Harga tanah kantor belum diatur", 400);
+      }
 
-        if (!land) {
-          throw new AppError("Data tanah tidak ditemukan", 400);
-        }
+      if (!land) {
+        throw new AppError("Data tanah tidak ditemukan", 400);
+      }
 
-        if (!land.area_size) {
-          throw new AppError("Data tanah tidak memiliki luas", 400);
-        }
+      if (!land.area_size) {
+        throw new AppError("Data tanah tidak memiliki luas", 400);
+      }
 
-        // Owner pertama = pemohon
-        const applicant = data.owners[0];
+      // Owner pertama = pemohon
+      const applicant = data.owners[0];
 
-        if (!applicant.person_id) {
-          throw new AppError("Pemohon utama tidak valid", 400);
-        }
+      if (!applicant.person_id) {
+        throw new AppError("Pemohon utama tidak valid", 400);
+      }
 
-        const file_number = `${landOffice.code}/${data.cert_type}/${year}/${lastNumber}`;
+      const file_number = `${landOffice.code}/${data.cert_type}/${year}/${lastNumber}`;
 
-        const areaSize = Number(land.area_size) || 0;
-        const pricePerM2 = Number(landOffice.price.price_per_m2) || 0;
-        const registrationFee = Number(landOffice.price.registration_fee) || 0;
+      const areaSize = Number(land.area_size) || 0;
+      const pricePerM2 = Number(landOffice.price.price_per_m2) || 0;
+      const registrationFee = Number(landOffice.price.registration_fee) || 0;
 
-        const landValue = areaSize * pricePerM2;
-        const adminFee = landValue / 1000;
-        const totalFeeCalculated = adminFee + registrationFee;
+      const landValue = areaSize * pricePerM2;
+      const adminFee = landValue / 1000;
+      const totalFeeCalculated = adminFee + registrationFee;
 
-        const finalTotalFee = isNaN(totalFeeCalculated)
-          ? 0
-          : Math.round(totalFeeCalculated);
+      const finalTotalFee = isNaN(totalFeeCalculated)
+        ? 0
+        : Math.round(totalFeeCalculated);
 
-        const application = await tx.application.create({
-          data: {
-            person: {
-              connect: { id: applicant.person_id },
-            },
-            land: {
-              connect: { id: data.land_id },
-            },
-            landOffice: {
-              connect: { id: data.land_office_id },
-            },
-            officer: {
-              connect: {
-                id: data.officer_id,
-              },
-            },
-            cert_code: data.cert_code,
-            file_number,
-            land_price_per_m2: landOffice.price.price_per_m2,
-            registration_fee: landOffice.price.registration_fee,
-            total_fee: BigInt(finalTotalFee),
-            nib: data.nib,
-            type: data.cert_type,
+      const application = await tx.application.create({
+        data: {
+          person: {
+            connect: { id: applicant.person_id },
           },
+          land: {
+            connect: { id: data.land_id },
+          },
+          landOffice: {
+            connect: { id: data.land_office_id },
+          },
+          officer: {
+            connect: {
+              id: data.officer_id,
+            },
+          },
+          certificate: {
+            connect: {
+              code: data.cert_code,
+            },
+          },
+          file_number,
+          land_price_per_m2: landOffice.price.price_per_m2,
+          registration_fee: landOffice.price.registration_fee,
+          total_fee: BigInt(finalTotalFee),
+          nib: data.nib,
+          type: data.cert_type,
+        },
+      });
+
+      const documents = AppDocumentService.mapApplicationDocuments(
+        application.id,
+        data,
+      );
+
+      if (documents.length > 0) {
+        await tx.applicationDocument.createMany({
+          data: documents,
         });
+      }
 
-        const documents = AppDocumentService.mapApplicationDocuments(
-          application.id,
-          data,
-        );
+      await tx.applicationOwner.createMany({
+        data: data.owners.map((owner) => ({
+          application_id: application.id,
+          person_id: owner.person_id,
+          share: Number(owner.share) ?? null,
+        })),
+      });
 
-        if (documents.length > 0) {
-          await tx.applicationDocument.createMany({
-            data: documents,
-          });
-        }
-
-        await tx.applicationOwner.createMany({
-          data: data.owners.map((owner) => ({
-            application_id: application.id,
-            person_id: owner.person_id,
-            share: Number(owner.share) ?? null,
-          })),
-        });
-
-        return application;
-      },
-    );
+      return application;
+    });
 
     moveTempFolder(tempFolder, `applications/${result.id}`);
     return {

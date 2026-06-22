@@ -191,10 +191,10 @@ export const getUser = async (id: string) => {
     });
 
     const adminRoles = [
+      "kepala kanwil",
+      "admin kanwil",
       "admin kantah",
       "kepala kantah",
-      "registration officer",
-      "notaris/PPAT",
     ];
 
     const isAdmin = person?.roles.some((rp: any) =>
@@ -214,7 +214,7 @@ export const getUser = async (id: string) => {
       ...person,
       username: person.username
         ? person.username
-        : `user_${id.toString().slice(0, 8)}...`,
+        : `user_${id.toString().slice(0, 6)}`,
       roles: person.roles.map((rp: any) => rp.role.name),
     };
   } catch (error: unknown) {

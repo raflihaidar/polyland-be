@@ -3,6 +3,13 @@ generator client {
   output   = "../generated/prisma"
 }
 
+generator erd {
+  provider    = "prisma-erd-generator"
+  output      = "./ERD.pdf"
+  ignoreEnums = true
+  // tableOnly = true
+}
+
 datasource db {
   provider = "postgresql"
 }
@@ -110,7 +117,7 @@ model Person {
   username String? @unique @db.VarChar(100)
   password String? @db.VarChar(100)
 
-  nip        String? @db.VarChar(20)
+  nip        String? @unique @db.VarChar(20)
   publicKey  String? @db.Text
   privateKey String? @db.Text
 
@@ -122,8 +129,6 @@ model Person {
 
   accountVerifications AccountVerification[]
   verifiedAccounts     AccountVerification[] @relation("VerificationApprover")
-  DeedOwner            Deed[]                @relation("DeedOwner")
-  DeedCreator          Deed[]                @relation("DeedCreator")
   officerApplications  Application[]         @relation("ApplicationOfficer")
   applications         Application[]
   roles                RolePerson[]
@@ -280,7 +285,7 @@ model Village {
 
 model Certificate {
   id             String            @id @default(uuid()) @db.Uuid
-  token_id       Int?              @unique @db.Integer
+  token_id       Int?              @db.Integer
   nib            String            @db.VarChar(100)
   code           String            @unique @db.VarChar(100)
   land_id        String            @db.Uuid
@@ -291,15 +296,16 @@ model Certificate {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @default(now())
   hash           String?           @db.VarChar(255)
-  application_id String?           @unique @db.Uuid
+  // application_id String?           @unique @db.Uuid
   tx_hash        String?           @db.VarChar(255)
   payment_status PaymentStatus     @default(PENDING)
   minting_status MintingStatus     @default(PENDING)
 
-  land        Land               @relation(fields: [land_id], references: [id])
-  application Application?       @relation(fields: [application_id], references: [id])
-  owners      CertificateOwner[]
-  notes       CertificateNote[]
+  land         Land               @relation(fields: [land_id], references: [id])
+  // application Application?       @relation(fields: [application_id], references: [id])
+  owners       CertificateOwner[]
+  notes        CertificateNote[]
+  applications Application[]
 
   @@map("certificates")
 }
@@ -329,24 +335,6 @@ model CertificateOwner {
   @@map("certificate_owners")
 }
 
-model Deed {
-  id          String @id @default(uuid()) @db.Uuid
-  number      String @unique @db.VarChar(100)
-  description String @db.VarChar(150)
-  cid         String @db.VarChar(255)
-
-  person_id String @db.Uuid
-  createdBy String @db.Uuid
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  owner   Person @relation("DeedOwner", fields: [person_id], references: [id])
-  creator Person @relation("DeedCreator", fields: [createdBy], references: [id])
-
-  @@map("deeds")
-}
-
 model Application {
   id             String  @id @default(uuid()) @db.Uuid
   person_id      String  @db.Uuid
@@ -374,9 +362,9 @@ model Application {
   person      Person                @relation(fields: [person_id], references: [id])
   landOffice  LandOffice            @relation(fields: [land_office_id], references: [id])
   officer     Person?               @relation("ApplicationOfficer", fields: [officer_id], references: [id])
+  certificate Certificate?          @relation(fields: [cert_code], references: [code])
   document    ApplicationDocument[]
   owners      ApplicationOwner[]
-  certificate Certificate?
 
   @@map("applications")
 }
@@ -476,20 +464,12 @@ model Module {
   @@map("modules")
 }
 
-model ModuleGroup {
-  id      Int     @id @default(autoincrement())
-  name    String  @unique @db.VarChar(50)
-  slug    String  @unique @db.VarChar(100)
-  section Section
-
-  @@map("module_groups")
-}
-
 model Role {
   id          Int             @id @default(autoincrement())
   name        String          @unique
   description String?
   created_at  DateTime        @default(now())
+  updated_at  DateTime        @default(now()) @updatedAt
   privileges  RolePrivilege[]
   rolePersons RolePerson[]
 

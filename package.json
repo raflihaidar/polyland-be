@@ -11,6 +11,7 @@
     "seed": "npx tsx backend/src/prisma/seeds/seed.ts"
   },
   "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.15.0",
     "@nomicfoundation/hardhat-ignition": "^3.0.5",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.1",
     "@nomicfoundation/hardhat-verify": "^3.0.11",
@@ -27,6 +28,8 @@
     "hardhat": "^3.0.15",
     "nodemon": "^3.1.11",
     "prisma": "^7.3.0",
+    "prisma-erd-generator": "^2.4.3",
+    "puppeteer": "^24.43.1",
     "tsx": "^4.21.0",
     "typescript": "~5.8.0",
     "viem": "^2.45.1",
@@ -60,7 +63,6 @@
     "node-cron": "^4.2.1",
     "pg": "^8.18.0",
     "pinata": "^2.5.1",
-    "puppeteer": "^24.37.5",
     "qrcode": "^1.5.4",
     "redis": "^5.10.0",
     "socket.io": "^4.8.3",

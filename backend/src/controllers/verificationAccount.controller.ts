@@ -42,13 +42,37 @@ export const getAllAccount = async (
 
     res.status(200).json({
       message: "Daftar akun berhasil didapatkan",
-      data : result,
+      data: result,
     });
   } catch (error) {
     console.log(error);
     next(error);
   }
 };
+
+export const getAccount = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { personId } = req.params;
+
+    const account = await VerifService.findAccountByPersonId(
+      personId as string,
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "Akun berhasil didapatkan",
+      data: account,
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+};
+
 export const submit = async (
   req: Request,
   res: Response,
