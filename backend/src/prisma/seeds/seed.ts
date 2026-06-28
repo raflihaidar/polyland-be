@@ -6,6 +6,8 @@ import { landOfficeModules } from "./landOffice.seed.js";
 import { districtModule } from "./district.seed.js";
 import { villageModule } from "./village.seed.js";
 import { landCertificateModule } from "./land-certificate.seed.js";
+import { provinceModule } from "./province.seed.js";
+import { regencyModule } from "./regency.seed.js";
 
 const main = async () => {
   const args = process.argv.slice(2);
@@ -25,6 +27,12 @@ const main = async () => {
       break;
     case "land-office":
       await landOfficeModules(prisma);
+      break;
+    case "province":
+      await provinceModule(prisma);
+      break;
+    case "regency":
+      await regencyModule(prisma);
       break;
     case "district":
       await districtModule(prisma);

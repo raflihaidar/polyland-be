@@ -12,13 +12,13 @@ export const seedRolePrivileges = async (prisma: PrismaClient) => {
 
   // Daftar role yang ingin diberi privilege
   const roles = [
-    { name: "admin aplikasi", id: 1 },
-    { name: "kepala kanwil", id: 2 },
-    { name: "admin kanwil", id: 3 },
-    { name: "kepala kantah", id: 4 },
-    { name: "admin", id: 5 },
-    { name: "citizen", id: 6 },
-    { name: "guest", id: 7 },
+    // { name: "admin aplikasi", id: 1 },
+    // { name: "kepala kanwil", id: 2 },
+    // { name: "admin kanwil", id: 3 },
+    { name: "admin kantah", id: 1 },
+    { name: "kepala kantah", id: 2 },
+    { name: "citizen", id: 3 },
+    { name: "guest", id: 4 },
   ];
 
   // Siapkan data RolePrivilege

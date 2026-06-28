@@ -323,16 +323,25 @@ export const submitApplication = async (
       const file_number = `${landOffice.code}/${data.cert_type}/${year}/${lastNumber}`;
 
       const areaSize = Number(land.area_size) || 0;
+      console.log("area size : ", areaSize);
       const pricePerM2 = Number(landOffice.price.price_per_m2) || 0;
+      console.log("harga per meter : ", pricePerM2);
       const registrationFee = Number(landOffice.price.registration_fee) || 0;
+      console.log("biaya pendaftaran : ", registrationFee);
 
       const landValue = areaSize * pricePerM2;
+      console.log("harga tanah : ", landValue);
       const adminFee = landValue / 1000;
+      console.log("biaya admin : ", adminFee);
       const totalFeeCalculated = adminFee + registrationFee;
+      console.log("biaya final : ", totalFeeCalculated);
 
       const finalTotalFee = isNaN(totalFeeCalculated)
         ? 0
         : Math.round(totalFeeCalculated);
+
+      finalTotalFee;
+      console.log("biaya final 2: ", finalTotalFee);
 
       const application = await tx.application.create({
         data: {

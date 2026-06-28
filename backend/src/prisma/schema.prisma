@@ -143,11 +143,11 @@ model Person {
 }
 
 model Land {
-  id             String  @id @default(uuid()) @db.Uuid
-  area_size      String? @db.VarChar(100)
-  street_address String  @db.Text
-  rt             String  @db.VarChar(50)
-  rw             String  @db.VarChar(50)
+  id             String @id @default(uuid()) @db.Uuid
+  area_size      Int?   @db.Integer
+  street_address String @db.Text
+  rt             String @db.VarChar(50)
+  rw             String @db.VarChar(50)
 
   province_code Int    @db.Integer
   regency_code  Int    @db.Integer

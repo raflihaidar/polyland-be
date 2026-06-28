@@ -2,6 +2,7 @@ import { prisma } from "../config/prisma.js";
 import { AppError } from "../utils/error.js";
 import { publicClient } from "../config/wallet.js";
 import { contractConfig } from "../config/wallet.js";
+import CryptoJS from "crypto-js";
 
 export const searchCertificate = async (search: string) => {
   try {
@@ -60,85 +61,201 @@ export const searchCertificate = async (search: string) => {
   }
 };
 
-export const getCertificates = async (person_id: string) => {
+export const generateUniqueCode = (length = 6): string => {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+  const randomSeed = Date.now().toString() + Math.random().toString();
+
+  const hash = CryptoJS.SHA256(randomSeed).toString();
+
+  let result = "";
+
+  for (let i = 0; i < length; i++) {
+    const index = parseInt(hash.substring(i * 2, i * 2 + 2), 16) % chars.length;
+
+    result += chars[index];
+  }
+
+  return result;
+};
+
+export const generateNIB = async (
+  provinceCode: number,
+  regencyCode: number,
+  indeksLetak: number,
+) => {
+  if (indeksLetak < 0 || indeksLetak > 9) {
+    throw new Error("Indeks letak harus antara 0 - 9");
+  }
+
+  const lastCertificate = await prisma.certificate.findFirst({
+    where: {
+      land: {
+        province_code: provinceCode,
+        regency_code: regencyCode,
+      },
+    },
+    orderBy: {
+      nib: "desc",
+    },
+    select: {
+      nib: true,
+    },
+  });
+
+  let nextSequence = 1;
+
+  if (lastCertificate?.nib) {
+    const lastSequence = lastCertificate.nib.slice(6, 15);
+    nextSequence = parseInt(lastSequence) + 1;
+  }
+
+  const sequenceFormatted = nextSequence.toString().padStart(9, "0");
+
+  const formatedRegencyCode = regencyCode % 100;
+
+  const nib =
+    provinceCode.toString().padStart(2, "0") +
+    "." +
+    formatedRegencyCode.toString().padStart(2, "0") +
+    "." +
+    sequenceFormatted +
+    "." +
+    indeksLetak.toString();
+
+  return nib;
+};
+
+export const getCertificates = async (
+  person_id: string,
+  page: number = 1,
+  limit: number = 10,
+  type?: string,
+  status?: string,
+  search?: string,
+  sortOrder: "asc" | "desc" = "desc",
+  sortBy: "createdAt" | "label" = "createdAt",
+) => {
   try {
-    const certificates = await prisma.certificate.findMany({
-      where: {
-        owners: {
-          some: {
-            person_id,
-          },
-        },
-        status: "AKTIF",
-      },
-      select: {
-        owners: {
-          select: {
-            person: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-        id: true,
-        code: true,
-        nib: true,
-        type: true,
-        status: true,
-        label: true,
-        land: {
-          select: {
-            province: {
-              select: {
-                name: true,
-              },
-            },
-            regency: {
-              select: {
-                name: true,
-              },
-            },
-            district: {
-              select: {
-                name: true,
-              },
-            },
-            village: {
-              select: {
-                name: true,
-              },
-            },
-            rt: true,
-            rw: true,
-          },
+    const skip = (page - 1) * limit;
+
+    const where: any = {
+      owners: {
+        some: {
+          person_id,
         },
       },
-    });
+      ...(type && { type }),
+      ...(status && { status }),
+      ...(search && {
+        OR: [
+          { nib: { contains: search, mode: "insensitive" } },
+          { code: { contains: search, mode: "insensitive" } },
+          { label: { contains: search, mode: "insensitive" } },
+          {
+            owners: {
+              some: {
+                person: {
+                  name: { contains: search, mode: "insensitive" },
+                },
+              },
+            },
+          },
+          {
+            land: {
+              OR: [
+                {
+                  province: { name: { contains: search, mode: "insensitive" } },
+                },
+                {
+                  regency: { name: { contains: search, mode: "insensitive" } },
+                },
+                {
+                  district: { name: { contains: search, mode: "insensitive" } },
+                },
+                {
+                  village: { name: { contains: search, mode: "insensitive" } },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    };
 
-    let result = certificates.map((item: any) => {
-      return {
-        id: item.id,
-        owners: item.owners.map((owner: any) => owner.person.name),
-        nib: item.nib,
-        code: item.code,
-        type: item.type,
-        status: item.status,
-        label: item.label,
-        address: {
-          province: item.land.province.name,
-          regency: item.land.regency.name,
-          district: item.land.district.name,
-          village: item.land.village.name,
-          rt: item.land.rt,
-          rw: item.land.rw,
+    const [certificates, total] = await Promise.all([
+      prisma.certificate.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          [sortBy]: sortOrder,
         },
-      };
-    });
+        select: {
+          owners: {
+            select: {
+              person: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+          id: true,
+          code: true,
+          nib: true,
+          type: true,
+          status: true,
+          label: true,
+          createdAt: true,
+          land: {
+            select: {
+              area_size: true,
+              province: { select: { name: true } },
+              regency: { select: { name: true } },
+              district: { select: { name: true } },
+              village: { select: { name: true } },
+              rt: true,
+              rw: true,
+            },
+          },
+        },
+      }),
+      prisma.certificate.count({ where }),
+    ]);
 
-    return result;
+    const result = certificates.map((item: any) => ({
+      id: item.id,
+      owners: item.owners.map((owner: any) => owner.person.name),
+      nib: item.nib,
+      code: item.code,
+      type: item.type,
+      status: item.status,
+      label: item.label,
+      area_size: item.land.area_size,
+      createdAt: item.createdAt,
+      address: {
+        province: item.land.province.name,
+        regency: item.land.regency.name,
+        district: item.land.district.name,
+        village: item.land.village.name,
+        rt: item.land.rt,
+        rw: item.land.rw,
+      },
+    }));
+
+    return {
+      data: result,
+      meta: {
+        total,
+        page,
+        limit,
+        total_pages: Math.ceil(total / limit),
+      },
+    };
   } catch (err: any) {
-    new AppError("Gagal mendapatkan sertifikat", 500, err.meta);
+    throw new AppError("Gagal mendapatkan sertifikat", 500, err.meta);
   }
 };
 
@@ -168,6 +285,7 @@ export const getCertificateById = async (
             type: true,
             status: true,
             cid: true,
+            label: true,
             owners: {
               select: {
                 ownership_pct: true,
@@ -176,6 +294,7 @@ export const getCertificateById = async (
                 },
               },
             },
+            createdAt: true,
             land: {
               select: {
                 province: { select: { name: true } },
@@ -200,6 +319,8 @@ export const getCertificateById = async (
       type: data.certificate.type,
       status: data.certificate.status,
       cid: data.certificate.cid,
+      createdAt: data.createdAt,
+      label: data.certificate.label,
 
       owners: data.certificate.owners.map((owner: any) => ({
         name: owner.person?.name,

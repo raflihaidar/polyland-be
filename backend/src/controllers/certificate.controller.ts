@@ -2,6 +2,10 @@ import * as CertificateService from "../services/certificate.service.js";
 import { verifyCertificate as verifyMock } from "../services/verifyCertMock.service.js";
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/error.js";
+import {
+  CertificateStatus,
+  CertificateType,
+} from "../generated/prisma/enums.js";
 
 export const searchCertificate = async (
   req: Request,
@@ -58,16 +62,27 @@ export const getCertificates = async (
 ) => {
   try {
     const { id } = req.person;
+    const { search, limit, page, type, status, sortOrder, sortBy } = req.query;
 
     if (!id) throw new AppError("id pengguna tidak ditemukan", 400);
 
-    const certificates = await CertificateService.getCertificates(id as string);
+    const certificates = await CertificateService.getCertificates(
+      id as string,
+      Number(page),
+      Number(limit),
+      type as CertificateType,
+      status as CertificateStatus,
+      search as string,
+      sortOrder as "asc" | "desc",
+      sortBy as "createdAt" | "label",
+    );
 
     res
       .json({
         status: "success",
         message: "Berhasil mendapatkan daftar sertifikat",
-        data: certificates,
+        data: certificates.data,
+        meta: certificates.meta,
       })
       .status(200);
   } catch (error: unknown) {
