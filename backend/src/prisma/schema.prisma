@@ -352,11 +352,13 @@ model Application {
   registration_fee  Int    @db.Integer
   total_fee         BigInt @default(0)
 
-  notes           String?   @db.VarChar(200)
-  payment_tx_hash String?
-  paidAt          DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @default(now())
+  order_id      String?       @db.VarChar(150)
+  notes         String?       @db.VarChar(200)
+  // payment_tx_hash String?
+  paymentSattus PaymentStatus @default(PENDING)
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now())
 
   land        Land                  @relation(fields: [land_id], references: [id])
   person      Person                @relation(fields: [person_id], references: [id])

@@ -12,12 +12,12 @@ import {
 import * as fileCounterService from "./fileCounter.service.js";
 import * as landService from "./land.service.js";
 import * as AppDocumentService from "./applicationDocument.service.js";
-// import { generateCertificate } from "./certificate.service";
 import { addCertificateJob } from "../jobs/certificate.jobs.js";
 import fs from "fs";
 import { serializeBigInt } from "../utils/parse.js";
 import { moveTempFolder } from "../utils/file.js";
 import path from "path";
+import { getPaymentInvoice } from "./payment.service.js";
 
 export const getListApplication = async (
   land_office_id: string,
@@ -406,17 +406,6 @@ export const submitApplication = async (
   }
 };
 
-// const documentTypeMap: Record<string, string> = {
-//   cert_file: "SERTIFIKAT_TANAH",
-//   ktp_penjual: "KTP_PENJUAL",
-//   kk_pembeli: "KK_PEMBELI",
-//   ktp_pembeli: "KTP_PEMBELI",
-//   akta_jual_beli: "AKTA_JUAL_BELI",
-//   fc_sppt: "SPPT",
-//   fc_pbb: "PBB",
-//   ssb: "SSB",
-// };
-
 export const updateApplicationStatus = async (
   fileNumber: string,
   status: ApplicationStatus,
@@ -637,7 +626,6 @@ export const updateApplication = async (
 
 export const verifyPayment = async (applicationId: string, notes: string[]) => {
   try {
-    console.log("test");
     const isSuccess = await prisma.application.update({
       where: {
         id: applicationId,
@@ -670,4 +658,25 @@ export const verifyPayment = async (applicationId: string, notes: string[]) => {
       error?.meta,
     );
   }
+};
+
+export const getApplicationPayment = async (id: string) => {
+  try {
+    let application = await prisma.application.findUnique({
+      where: {
+        id,
+      },
+      select: {
+        total_fee: true,
+      },
+    });
+
+    console.log("amount : ", application);
+
+    const paymentDetail = await getPaymentInvoice(
+      Number(application.total_fee),
+    );
+
+    return paymentDetail;
+  } catch (error) {}
 };

@@ -2,11 +2,14 @@ import express from "express";
 import {
   getListApplication,
   getApplication,
+  getApplicationPayment,
+  getPaymentStatus,
   searchApplication,
   submitApplication,
   updateApplicationStatus,
   updateApplication,
   verifyPayment,
+  cancelPayment,
 } from "../controllers/ownershipTransfer.controller.js";
 import { authentication } from "../middlewares/authentication.js";
 import { authorize } from "../middlewares/authorization.js";
@@ -21,6 +24,16 @@ router.get(
   "/:land_office_id",
   authorize("peralihan-hak", "read"),
   getListApplication,
+);
+router.get(
+  "/payment-detail/:id",
+  authorize("peralihan-hak", "read"),
+  getApplicationPayment,
+);
+router.get(
+  "/payment-status/:order_id",
+  authorize("peralihan-hak", "read"),
+  getPaymentStatus,
 );
 router.get("/detail/:id", authorize("peralihan-hak", "read"), getApplication);
 router.post(
@@ -39,6 +52,11 @@ router.post(
     { name: "kk_pembeli", maxCount: 10 },
   ]),
   submitApplication,
+);
+router.post(
+  "/payment/:order_id/cancel",
+  authorize("peralihan-hak", "update"),
+  cancelPayment,
 );
 router.put("/verify/payment/:id", verifyPayment);
 router.put(

@@ -1,4 +1,5 @@
 import * as ownershipService from "../services/ownershipTransfer.service.js";
+import * as paymentService from "../services/payment.service.js";
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/error.js";
 import {
@@ -62,6 +63,30 @@ export const getApplication = async (
   }
 };
 
+export const getApplicationPayment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) throw new AppError("Invoice Pembayaran tidak ditemukan", 404);
+
+    const result = await ownershipService.getApplicationPayment(id as string);
+
+    if (!result)
+      throw new AppError("Invoice Pembayaran tidak ditemukan", 404, {});
+
+    res.status(200).json({
+      message: "Invoice pembayaran berhasil didapatkan",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const searchApplication = async (
   req: Request,
   res: Response,
@@ -71,7 +96,11 @@ export const searchApplication = async (
     const { fileNumber } = req.query;
     const person_id = req.person?.id;
 
-    if (!fileNumber) throw new AppError("Berkas tidak ditemukan", 404);
+    if (!fileNumber)
+      throw new AppError(
+        "Tidak ditemukan berkas dengan nomor yang dicari. Periksa kembali nomor berkas dan coba lagi.",
+        404,
+      );
 
     const result = await ownershipService.searchApplication(
       fileNumber as string,
@@ -81,7 +110,7 @@ export const searchApplication = async (
     res.status(200).json({
       status: !result ? "not found" : "success",
       message: !result
-        ? "Berkas tidak ditemukan"
+        ? "Tidak ditemukan berkas dengan nomor yang dicari. Periksa kembali nomor berkas dan coba lagi."
         : "Berkas berhasil didapatkan",
       data: result,
     });
@@ -405,6 +434,52 @@ export const verifyPayment = async (
     res.status(200).json({
       status: "success",
       message: "Berhasil Melakukan verifikasi pembayaran",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPaymentStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { order_id } = req.params;
+
+    if (!order_id) throw new AppError("Pembayaran tidak ditemukan", 404);
+
+    console.log("order id controler : ", order_id);
+
+    const result = await paymentService.getPaymentStatus(order_id as string);
+
+    if (!result) throw new AppError("Pembayaran tidak ditemukan", 404, {});
+
+    res.status(200).json({
+      message: "Status pembayaran berhasil didapatkan",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const cancelPayment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { order_id } = req.params;
+
+    if (!order_id) throw new AppError("Pembayaran tidak ditemukan", 404);
+
+    const result = await paymentService.cancelPayment(order_id as string);
+
+    res.status(200).json({
+      message: "Pembayaran berhasil dibatalkan",
       data: result,
     });
   } catch (error) {
