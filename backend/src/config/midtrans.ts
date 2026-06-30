@@ -1,5 +1,5 @@
 import midtransClient from "midtrans-client";
-import "dotenv/config";
+// import "dotenv/config";
 
 export const coreApi = new midtransClient.CoreApi({
   isProduction: false,

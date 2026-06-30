@@ -3,12 +3,12 @@ generator client {
   output   = "../generated/prisma"
 }
 
-generator erd {
-  provider    = "prisma-erd-generator"
-  output      = "./ERD.pdf"
-  ignoreEnums = true
-  // tableOnly = true
-}
+// generator erd {
+//   provider    = "prisma-erd-generator"
+//   output      = "./ERD.pdf"
+//   ignoreEnums = true
+//   tableOnly = true
+// }
 
 datasource db {
   provider = "postgresql"

@@ -1,6 +1,6 @@
 # Install Dependencies :
 
-1. Node <= 24
+1. Node v=24
 2. postgresql v=16
 3. redis v=7.0.15
 

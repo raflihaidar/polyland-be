@@ -2,7 +2,6 @@ import { createPublicClient, createWalletClient, http, webSocket } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { polygonAmoy } from "viem/chains";
 import { CertificateABI } from "../abi/certificateNFT.js";
-import { Abi } from "viem";
 
 const RPC_URL = process.env.RPC_URL;
 const WS_RPC_URL = process.env.RPC_WS_URL;

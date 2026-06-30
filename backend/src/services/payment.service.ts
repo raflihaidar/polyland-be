@@ -1,6 +1,6 @@
 import { coreApi } from "../config/midtrans.js";
 import { AppError } from "../utils/error.js";
-import "dotenv/config";
+// import "dotenv/config";
 import axios from "axios";
 
 export const getPaymentInvoice = async (amount: number) => {
