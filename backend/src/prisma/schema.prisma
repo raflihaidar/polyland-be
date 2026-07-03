@@ -25,10 +25,14 @@ enum CertificateStatus {
 enum ApplicationStatus {
   VERIFIKASI_BERKAS
   MENUNGGU_PEMBAYARAN
-  PENANDATANGANAN
+  VERIFIKASI_PEMBAYARAN
+  PENERBITAN_SERTIFIKAT
   DITOLAK
   SELESAI
   TERJADI_KESALAHAN
+  PEMBAYARAN_DIBATALKAN
+  PEMBAYARAN_KADALUARSA
+  PEMBAYARAN_DIKEMBALIKAN
 }
 
 enum Section {
@@ -69,6 +73,8 @@ enum PaymentStatus {
   PENDING
   SUCCESS
   EXPIRED
+  CANCELED
+  REFUND
 }
 
 enum MintingStatus {
@@ -346,19 +352,16 @@ model Application {
   type   CertificateType
   nib    String            @db.VarChar(100)
 
-  file_number       String @unique @db.VarChar(100)
-  cert_code         String @db.VarChar(100)
-  land_price_per_m2 Int    @db.Integer
-  registration_fee  Int    @db.Integer
-  total_fee         BigInt @default(0)
+  file_number       String  @unique @db.VarChar(100)
+  cert_code         String  @db.VarChar(100)
+  land_price_per_m2 Int     @db.Integer
+  registration_fee  Int     @db.Integer
 
-  order_id      String?       @db.VarChar(150)
-  notes         String?       @db.VarChar(200)
-  // payment_tx_hash String?
-  paymentSattus PaymentStatus @default(PENDING)
-  paidAt        DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @default(now())
+  total_fee         BigInt @default(0)
+  notes             String? @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
 
   land        Land                  @relation(fields: [land_id], references: [id])
   person      Person                @relation(fields: [person_id], references: [id])
@@ -367,8 +370,26 @@ model Application {
   certificate Certificate?          @relation(fields: [cert_code], references: [code])
   document    ApplicationDocument[]
   owners      ApplicationOwner[]
+  payments    ApplicationPayment[]
 
   @@map("applications")
+}
+
+model ApplicationPayment {
+  id             Int           @id @default(autoincrement())
+  application_id String        @db.Uuid
+  order_id       String        @unique @db.VarChar(150)
+  qr_url         String        @db.Text
+  status         PaymentStatus @default(PENDING)
+  amount         BigInt        @default(0)
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now())
+
+  application Application @relation(fields: [application_id], references: [id])
+
+  @@map("application_payments")
 }
 
 model ApplicationDocument {

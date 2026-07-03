@@ -21,6 +21,7 @@ import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { getMidtransNotification } from "./controllers/ownershipTransfer.controller.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,7 +54,9 @@ app.use("/api/privilege", privilegeRouter);
 app.use("/api/health", healthRouter);
 app.use("/uploads", express.static(path.join(__dirname, "./uploads")));
 app.use("/api/worker-result", workerResultRouter);
+app.post('/api/midtrans-webhook', getMidtransNotification)
 app.use(errorHandler);
+
 
 cron.schedule(
   "0 0 * * *",

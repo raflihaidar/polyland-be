@@ -8,16 +8,19 @@ import {
 import {
   ApplicationStatus,
   CertificateType,
+  PaymentStatus,
 } from "../generated/prisma/enums.js";
 import * as fileCounterService from "./fileCounter.service.js";
 import * as landService from "./land.service.js";
 import * as AppDocumentService from "./applicationDocument.service.js";
 import { addCertificateJob } from "../jobs/certificate.jobs.js";
 import fs from "fs";
-import { serializeBigInt } from "../utils/parse.js";
+import { mapPaymentStatus, serializeBigInt } from "../utils/parse.js";
 import { moveTempFolder } from "../utils/file.js";
 import path from "path";
-import { getPaymentInvoice } from "./payment.service.js";
+import { createPayment, isValidNotification } from "./payment.service.js";
+import { MidtransNotification } from "../types/domain/payment.type.js";
+import { tryCatch } from "bullmq";
 
 export const getListApplication = async (
   land_office_id: string,
@@ -140,92 +143,86 @@ export const getListApplication = async (
 
 export const getApplication = async (id: string) => {
   try {
-    const application = await prisma.application.findUnique({
-      where: {
-        id: id,
-      },
-      include: {
-        // applicationDocuments: true,
-        document: {
-          where: {
-            person_id: null,
+    return await prisma.$transaction(async (tx: any) => {
+
+      const application = await tx.application.findUnique({
+        where: { id: id },
+        include: {
+          document: {
+            where: { person_id: null },
           },
-        },
-        land: {
-          select: {
-            id: true,
-            area_size: true,
-            street_address: true,
-            rt: true,
-            rw: true,
-            province: {
-              select: {
-                name: true,
-              },
-            },
-            regency: {
-              select: {
-                name: true,
-              },
-            },
-            district: {
-              select: {
-                name: true,
-              },
-            },
-            village: {
-              select: {
-                name: true,
-              },
+          land: {
+            select: {
+              id: true,
+              area_size: true,
+              street_address: true,
+              rt: true,
+              rw: true,
+              province: { select: { name: true } },
+              regency: { select: { name: true } },
+              district: { select: { name: true } },
+              village: { select: { name: true } },
             },
           },
-        },
-        landOffice: {
-          select: {
-            name: true,
+          landOffice: {
+            select: { name: true },
           },
-        },
-        owners: {
-          select: {
-            person: {
-              select: {
-                id: true,
-                name: true,
-                nik: true,
-                email: true,
-                phone: true,
-                documentIdentity: {
-                  where: {
-                    application_id: id,
+          owners: {
+            select: {
+              person: {
+                select: {
+                  id: true,
+                  name: true,
+                  nik: true,
+                  email: true,
+                  phone: true,
+                  documentIdentity: {
+                    where: { application_id: id },
                   },
                 },
               },
+              share: true,
             },
-            share: true,
           },
         },
-      },
+      });
+
+      if (!application) {
+        throw new AppError("Permohonan tidak ditemukan", 200)
+      };
+
+      const payment = await tx.applicationPayment.findFirst({
+        where: {
+          application_id: application.id,
+          status: 'PENDING',
+        },
+        select: {
+          amount: true
+        }
+      });
+
+      return serializeBigInt({
+        ...application,
+        total_fee: application.total_fee,
+        owners: application.owners.map((o: any) => {
+          const { documentIdentity, ...person } = o.person;
+
+          return {
+            ...o,
+            person: {
+              ...person,
+              document: documentIdentity,
+            },
+          };
+        }),
+      });
     });
-
-    if (!application) return null;
-
-    return {
-      ...application,
-      total_fee: Number(application.total_fee),
-      owners: application?.owners.map((o: any) => {
-        const { documentIdentity, ...person } = o.person;
-
-        return {
-          ...o,
-          person: {
-            ...person,
-            document: documentIdentity,
-          },
-        };
-      }),
-    };
   } catch (error) {
-    throw error;
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError("Terjadi kesalahan saat mendapatkan data permohonan", 500, error)
   }
 };
 
@@ -237,8 +234,8 @@ export const searchApplication = async (
     const application = await prisma.application.findFirst({
       where: search
         ? {
-            file_number: search,
-          }
+          file_number: search,
+        }
         : {},
       include: {
         officer: {
@@ -250,11 +247,6 @@ export const searchApplication = async (
           select: {
             id: true,
             name: true,
-          },
-        },
-        land: {
-          select: {
-            area_size: true,
           },
         },
         landOffice: {
@@ -323,25 +315,16 @@ export const submitApplication = async (
       const file_number = `${landOffice.code}/${data.cert_type}/${year}/${lastNumber}`;
 
       const areaSize = Number(land.area_size) || 0;
-      console.log("area size : ", areaSize);
       const pricePerM2 = Number(landOffice.price.price_per_m2) || 0;
-      console.log("harga per meter : ", pricePerM2);
       const registrationFee = Number(landOffice.price.registration_fee) || 0;
-      console.log("biaya pendaftaran : ", registrationFee);
 
       const landValue = areaSize * pricePerM2;
-      console.log("harga tanah : ", landValue);
       const adminFee = landValue / 1000;
-      console.log("biaya admin : ", adminFee);
       const totalFeeCalculated = adminFee + registrationFee;
-      console.log("biaya final : ", totalFeeCalculated);
 
       const finalTotalFee = isNaN(totalFeeCalculated)
         ? 0
         : Math.round(totalFeeCalculated);
-
-      finalTotalFee;
-      console.log("biaya final 2: ", finalTotalFee);
 
       const application = await tx.application.create({
         data: {
@@ -367,9 +350,9 @@ export const submitApplication = async (
           file_number,
           land_price_per_m2: landOffice.price.price_per_m2,
           registration_fee: landOffice.price.registration_fee,
-          total_fee: BigInt(finalTotalFee),
           nib: data.nib,
           type: data.cert_type,
+          total_fee: finalTotalFee
         },
       });
 
@@ -401,7 +384,6 @@ export const submitApplication = async (
       total_fee: Number(result.total_fee),
     };
   } catch (error) {
-    console.log(error);
     throw new AppError("Gagal submit application", 500);
   }
 };
@@ -412,17 +394,42 @@ export const updateApplicationStatus = async (
   note?: string,
 ) => {
   try {
+    // 1. Ambil data awal untuk validasi
     const application = await prisma.application.findUnique({
       where: { file_number: fileNumber },
+      select: {
+        id: true,
+        file_number: true,
+        total_fee: true,
+        status: true,
+      },
     });
 
     if (!application) {
       throw new AppError("Permohonan tidak ditemukan", 404);
     }
 
-    // if (application.status === status) {
-    //   throw new AppError("Permohonan sedang diproses", 400);
-    // }
+    let paymentData: any = null;
+
+    if (status === ApplicationStatus.MENUNGGU_PEMBAYARAN) {
+      const payment = await createPayment(Number(application.total_fee));
+      if (!payment) {
+        throw new AppError("Pembayaran gagal dibuat", 400);
+      }
+      paymentData = payment;
+    }
+
+    if (paymentData) {
+      await prisma.applicationPayment.create({
+        data: {
+          application_id: application.id,
+          order_id: paymentData.order_id,
+          qr_url: paymentData.qr_url,
+          status: mapPaymentStatus(paymentData.status),
+          amount: Number(paymentData.amount),
+        },
+      });
+    }
 
     const updated = await prisma.application.update({
       where: { file_number: fileNumber },
@@ -432,15 +439,16 @@ export const updateApplicationStatus = async (
       },
     });
 
-    return {
-      ...updated,
-      total_fee: Number(updated.total_fee),
-    };
+    return updated;
   } catch (error) {
     console.log("error : ", error);
+    if (error instanceof AppError) {
+      throw error;
+    }
     throw new AppError("Gagal memproses permohonan", 500);
   }
 };
+
 
 export const updateApplication = async (
   applicationId: string,
@@ -450,11 +458,7 @@ export const updateApplication = async (
   const filesToDelete: string[] = [];
 
   const result = await prisma.$transaction(
-    async (tx: Prisma.TransactionClient) => {
-      // ======================
-      // CHECK APPLICATION
-      // ======================
-
+    async (tx: any) => {
       const application = await tx.application.findUnique({
         where: {
           id: applicationId,
@@ -624,14 +628,14 @@ export const updateApplication = async (
   );
 };
 
-export const verifyPayment = async (applicationId: string, notes: string[]) => {
+export const enqueueCertificateGeneration = async (applicationId: string, notes: string[]) => {
   try {
     const isSuccess = await prisma.application.update({
       where: {
         id: applicationId,
       },
       data: {
-        status: "PENANDATANGANAN",
+        status: "PENERBITAN_SERTIFIKAT",
       },
       select: {
         file_number: true,
@@ -643,17 +647,12 @@ export const verifyPayment = async (applicationId: string, notes: string[]) => {
       notes,
     };
     if (isSuccess) {
-      console.log("kirim ke worker");
       const job = await addCertificateJob(jobPayloads);
-
-      console.log("Job ID:", job.id); // ← cek ini muncul tidak
-      console.log("Job Name:", job.name);
-
       return { jobId: job.id };
     }
   } catch (error: any) {
     throw new AppError(
-      "Pembayaran Gagal, silahkan coba lagi",
+      "Terjadi kesalahan saat memproses permohonan penerbitan sertifikat. Silakan coba kembali.",
       500,
       error?.meta,
     );
@@ -667,16 +666,119 @@ export const getApplicationPayment = async (id: string) => {
         id,
       },
       select: {
-        total_fee: true,
+        id: true,
+        createdAt: true,
+        owners: {
+          select: {
+            person: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
+        landOffice: {
+          select: {
+            name: true,
+            address: true,
+            email: true,
+            phone: true
+          },
+        }
       },
     });
 
-    console.log("amount : ", application);
+    if (!application) {
+      return new AppError('permohonan tidak ditemukan', 200)
+    }
 
-    const paymentDetail = await getPaymentInvoice(
-      Number(application.total_fee),
-    );
+    return serializeBigInt({
+      application
+    });
+  } catch (error: unknown) {
+    if (error instanceof AppError) {
+      throw error
+    }
 
-    return paymentDetail;
-  } catch (error) {}
+    throw new AppError("Terjadi kesalahan saat mengambil data permohonan", 500)
+  }
 };
+
+export const getMidtransNotification = async (notification: MidtransNotification) => {
+  try {
+    if (!notification) {
+      throw new AppError('Tidak ada notifikasi yang dikirimkan', 400)
+    }
+
+    const { transaction_status, order_id } = await isValidNotification(notification)
+
+    if (transaction_status === 'settlement') {
+      console.log(`Transaksi ${order_id} BERHASIL dibayar.`);
+      await prisma.$transaction(async (tx) => {
+        const paymentApp = await tx.applicationPayment.update({
+          where: {
+            order_id
+          },
+          data: {
+            status: 'SUCCESS',
+            paidAt: new Date()
+          },
+          select: {
+            application_id: true
+          }
+        })
+
+        await tx.application.update({
+          where: {
+            id: paymentApp.application_id
+          },
+          data: {
+            status: 'VERIFIKASI_PEMBAYARAN',
+            updatedAt: new Date()
+          }
+        })
+      })
+    } else if (['refund', 'expire'].includes(transaction_status)) {
+      console.log(`Transaksi ${order_id} GAGAL/BATAL.`);
+      let paymentStatus: PaymentStatus;
+      if (transaction_status === 'expire') {
+        paymentStatus = 'EXPIRED'
+      } else if (transaction_status === 'refund') {
+        paymentStatus = 'REFUND'
+      } else {
+        paymentStatus = 'EXPIRED'
+      }
+
+      await prisma.$transaction(async (tx) => {
+        const paymentApp = await tx.applicationPayment.update({
+          where: {
+            order_id
+          },
+          data: {
+            status: paymentStatus,
+          },
+          select: {
+            application_id: true
+          }
+        })
+
+        await tx.application.update({
+          where: {
+            id: paymentApp.application_id
+          },
+          data: {
+            status: paymentStatus === 'EXPIRED' ? 'PEMBAYARAN_KADALUARSA' : paymentStatus === 'REFUND' ? 'PEMBAYARAN_DIKEMBALIKAN' : 'TERJADI_KESALAHAN',
+            updatedAt : new Date()
+          }
+        })
+      })
+
+    }
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      throw error
+    }
+
+    throw new AppError('Terjadi kesalahan saat mengirim notifikasi', 500, error)
+  }
+}

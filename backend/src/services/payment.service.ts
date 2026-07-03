@@ -1,9 +1,37 @@
 import { coreApi } from "../config/midtrans.js";
+import { MidtransNotification } from "../types/domain/payment.type.js";
 import { AppError } from "../utils/error.js";
-// import "dotenv/config";
+import crypto from 'crypto';
 import axios from "axios";
 
-export const getPaymentInvoice = async (amount: number) => {
+
+export const isValidNotification = async (notification : MidtransNotification) => {
+  try {
+    const { order_id, status_code, gross_amount, signature_key, transaction_status } = notification;
+
+    const stringToHash = `${order_id}${status_code}${gross_amount}${process.env.MIDTRANS_SERVER_KEY}`;
+    const localSignature = crypto
+      .createHash('sha512')
+      .update(stringToHash)
+      .digest('hex');
+
+    if (localSignature !== signature_key) {
+       throw new AppError('Invalid Signature Key', 400)
+    }
+
+    return {
+       transaction_status,
+       order_id
+    }
+  } catch (error) {
+    if(error instanceof AppError){
+      throw error
+    }
+    throw new AppError("Error saat mendapatkan notifikasi dari midtrans", 500)
+  }
+}
+
+export const createPayment = async (amount: number) => {
   try {
     const chargeParameter = {
       payment_type: "qris",
@@ -15,15 +43,21 @@ export const getPaymentInvoice = async (amount: number) => {
 
     const res = await coreApi.charge(chargeParameter);
 
+    if(!res) return null
+
     const invoice = {
       status_code: res.status_code,
       order_id: res.order_id,
       amount: res.gross_amount,
       payment_type: res.payment_type,
       status: res.transaction_status,
-      qr_url: res.actions.url,
+      qr_url: res.actions[0].url,
       expiry_time: res.expiry_time,
     };
+
+
+    console.log("invoice : ", invoice)
+
     return invoice;
   } catch (err: any) {
     console.log(err);

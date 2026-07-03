@@ -9,6 +9,7 @@ import {
 import { ApplicationStatus } from "../generated/prisma/enums.js";
 import fs from "fs";
 import path from "path";
+import { MidtransNotification } from "../types/domain/payment.type.js";
 
 export const getListApplication = async (
   req: Request,
@@ -272,14 +273,18 @@ export const updateApplicationStatus = async (
       note,
     );
 
-    const statusMessages: Record<ApplicationStatus, string> = {
-      // DIPROSES: "Permohonan sedang diproses",
-      VERIFIKASI_BERKAS: "Permohonan dalam tahap verifikasi berkas",
-      MENUNGGU_PEMBAYARAN: "Silahkan melakukan pembayaran terlebih dahulu",
-      PENANDATANGANAN: "Permohonan dalam tahap penandatanganan",
-      DITOLAK: "Permohonan anda telah ditolak",
-      SELESAI: "Permohonan telah selesai diproses",
-    };
+  const statusMessages: Record<ApplicationStatus, string> = {
+    VERIFIKASI_BERKAS: "Permohonan dalam tahap verifikasi berkas",
+    MENUNGGU_PEMBAYARAN: "Silahkan melakukan pembayaran terlebih dahulu",
+    PENERBITAN_SERTIFIKAT: "Permohonan dalam tahap penerbitan sertifikat",
+    VERIFIKASI_PEMBAYARAN : "Pembayaran telah diterima dan sedang diverifikasi",
+    PEMBAYARAN_DIBATALKAN: "Pembayaran telah dibatalkan",
+    PEMBAYARAN_KADALUARSA: "Batas waktu pembayaran telah berakhir",
+    PEMBAYARAN_DIKEMBALIKAN: "Pembayaran telah dikembalikan (refund)",
+    DITOLAK: "Permohonan anda telah ditolak",
+    SELESAI: "Permohonan telah selesai diproses",
+    TERJADI_KESALAHAN: "Terjadi kesalahan saat membuat permohonan"
+  };
 
     res.status(200).json({
       status: "success",
@@ -287,6 +292,21 @@ export const updateApplicationStatus = async (
       data: result,
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const getMidtransNotification = async (
+  req: Request<{}, {}, MidtransNotification>,
+  res: Response,
+  next: NextFunction
+): Promise<void> => { 
+  try {
+    const notificationData = req.body; 
+    await ownershipService.getMidtransNotification(notificationData);
+
+    res.status(200).json({ status: 'success', message: 'Notification received' });
+  } catch (error: any) {
     next(error);
   }
 };
@@ -417,7 +437,7 @@ export const updateApplication = async (
   }
 };
 
-export const verifyPayment = async (
+export const enqueueCertificateGeneration = async (
   req: Request,
   res: Response,
   next: NextFunction,
@@ -426,14 +446,14 @@ export const verifyPayment = async (
     const { id } = req.params;
     const { notes } = req.body;
 
-    const result = await ownershipService.verifyPayment(
+    const result = await ownershipService.enqueueCertificateGeneration(
       id as string,
       notes as string[],
     );
 
     res.status(200).json({
       status: "success",
-      message: "Berhasil Melakukan verifikasi pembayaran",
+      message: "Permintaan penerbitan sertifikat telah dimasukkan ke antrean",
       data: result,
     });
   } catch (error) {

@@ -1,5 +1,6 @@
 import fs from "fs";
 import crypto from "crypto";
+import { PaymentStatus } from "../generated/prisma/enums.js";
 
 export const serializeBigInt = (data: any) => {
   return JSON.parse(
@@ -59,4 +60,28 @@ export const decimalToFraction = (decimal: number) => {
   }
 
   return `${numerator}/${denominator}`;
+};
+
+export const mapPaymentStatus = (midtransStatus: string): PaymentStatus => {
+  const status = midtransStatus.toLowerCase();
+
+  switch (status) {
+    case 'settlement':
+      return PaymentStatus.SUCCESS;
+
+    case 'pending':
+      return PaymentStatus.PENDING;
+
+    case 'expire':
+      return PaymentStatus.EXPIRED;
+
+    case 'cancel':
+      return PaymentStatus.CANCELED;
+
+    case 'refund':
+      return PaymentStatus.REFUND;
+
+    default:
+      return PaymentStatus.PENDING;
+  }
 };

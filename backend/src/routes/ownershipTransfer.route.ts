@@ -4,11 +4,12 @@ import {
   getApplication,
   getApplicationPayment,
   getPaymentStatus,
+  getMidtransNotification,
   searchApplication,
   submitApplication,
   updateApplicationStatus,
   updateApplication,
-  verifyPayment,
+  enqueueCertificateGeneration,
   cancelPayment,
 } from "../controllers/ownershipTransfer.controller.js";
 import { authentication } from "../middlewares/authentication.js";
@@ -58,7 +59,7 @@ router.post(
   authorize("peralihan-hak", "update"),
   cancelPayment,
 );
-router.put("/verify/payment/:id", verifyPayment);
+router.post("/enqueue-certificate/:id", enqueueCertificateGeneration);
 router.put(
   "/status",
   authorize("peralihan-hak", "update"),
