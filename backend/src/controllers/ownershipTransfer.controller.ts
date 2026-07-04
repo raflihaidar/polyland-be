@@ -273,18 +273,33 @@ export const updateApplicationStatus = async (
       note,
     );
 
-  const statusMessages: Record<ApplicationStatus, string> = {
-    VERIFIKASI_BERKAS: "Permohonan dalam tahap verifikasi berkas",
-    MENUNGGU_PEMBAYARAN: "Silahkan melakukan pembayaran terlebih dahulu",
-    PENERBITAN_SERTIFIKAT: "Permohonan dalam tahap penerbitan sertifikat",
-    VERIFIKASI_PEMBAYARAN : "Pembayaran telah diterima dan sedang diverifikasi",
-    PEMBAYARAN_DIBATALKAN: "Pembayaran telah dibatalkan",
-    PEMBAYARAN_KADALUARSA: "Batas waktu pembayaran telah berakhir",
-    PEMBAYARAN_DIKEMBALIKAN: "Pembayaran telah dikembalikan (refund)",
-    DITOLAK: "Permohonan anda telah ditolak",
-    SELESAI: "Permohonan telah selesai diproses",
-    TERJADI_KESALAHAN: "Terjadi kesalahan saat membuat permohonan"
-  };
+    // const statusMessages: Record<ApplicationStatus, string> = {
+    //   VERIFIKASI_BERKAS: "Permohonan dalam tahap verifikasi berkas",
+    //   MENUNGGU_PEMBAYARAN: "Silahkan melakukan pembayaran terlebih dahulu",
+    //   PROSES_PENERBITAN: "Permohonan dalam tahap penerbitan sertifikat",
+    //   VERIFIKASI_PEMBAYARAN:
+    //     "Pembayaran telah diterima dan sedang diverifikasi",
+    //   PEMBAYARAN_DIBATALKAN: "Pembayaran telah dibatalkan",
+    //   PEMBAYARAN_KADALUARSA: "Batas waktu pembayaran telah berakhir",
+    //   PEMBAYARAN_DIKEMBALIKAN: "Pembayaran telah dikembalikan (refund)",
+    //   DITOLAK: "Permohonan anda telah ditolak",
+    //   SELESAI: "Permohonan telah selesai diproses",
+    //   TERJADI_KESALAHAN: "Terjadi kesalahan saat membuat permohonan",
+    // };
+
+    const statusMessages: Record<ApplicationStatus, string> = {
+      VERIFIKASI_BERKAS: "Permohonan dalam tahap verifikasi berkas",
+      MENUNGGU_PEMBAYARAN: "Menunggu pembayaran dari pemohon",
+      VERIFIKASI_PEMBAYARAN:
+        "Pembayaran telah diterima dan sedang diverifikasi",
+      PROSES_PENERBITAN: "Dalam proses penerbitan sertifikat",
+      PEMBAYARAN_DIBATALKAN: "Pembayaran berhasil dibatalkan",
+      PEMBAYARAN_KADALUARSA: "Pembayaran kedaluwarsa",
+      PEMBAYARAN_DIKEMBALIKAN: "Pembayaran berhasil dikembalikan",
+      DITOLAK: "Permohonan berhasil ditolak",
+      SELESAI: "Permohonan selesai",
+      TERJADI_KESALAHAN: "Terjadi kesalahan pada proses permohonan",
+    };
 
     res.status(200).json({
       status: "success",
@@ -299,13 +314,15 @@ export const updateApplicationStatus = async (
 export const getMidtransNotification = async (
   req: Request<{}, {}, MidtransNotification>,
   res: Response,
-  next: NextFunction
-): Promise<void> => { 
+  next: NextFunction,
+): Promise<void> => {
   try {
-    const notificationData = req.body; 
+    const notificationData = req.body;
     await ownershipService.getMidtransNotification(notificationData);
 
-    res.status(200).json({ status: 'success', message: 'Notification received' });
+    res
+      .status(200)
+      .json({ status: "success", message: "Notification received" });
   } catch (error: any) {
     next(error);
   }

@@ -192,7 +192,7 @@ export const verify = async (data: VerificationAccountUpdate) => {
       }
 
       if (isRejected) {
-        tx.accountVerification.update({
+        await tx.accountVerification.update({
           where: {
             id: data.id,
           },

@@ -143,86 +143,87 @@ export const getListApplication = async (
 
 export const getApplication = async (id: string) => {
   try {
-    return await prisma.$transaction(async (tx: any) => {
-
-      const application = await tx.application.findUnique({
-        where: { id: id },
-        include: {
-          document: {
-            where: { person_id: null },
+    const application = await prisma.application.findUnique({
+      where: { id },
+      include: {
+        document: {
+          where: { person_id: null },
+        },
+        land: {
+          select: {
+            id: true,
+            area_size: true,
+            street_address: true,
+            rt: true,
+            rw: true,
+            province: { select: { name: true } },
+            regency: { select: { name: true } },
+            district: { select: { name: true } },
+            village: { select: { name: true } },
           },
-          land: {
-            select: {
-              id: true,
-              area_size: true,
-              street_address: true,
-              rt: true,
-              rw: true,
-              province: { select: { name: true } },
-              regency: { select: { name: true } },
-              district: { select: { name: true } },
-              village: { select: { name: true } },
-            },
-          },
-          landOffice: {
-            select: { name: true },
-          },
-          owners: {
-            select: {
-              person: {
-                select: {
-                  id: true,
-                  name: true,
-                  nik: true,
-                  email: true,
-                  phone: true,
-                  documentIdentity: {
-                    where: { application_id: id },
-                  },
+        },
+        landOffice: {
+          select: { name: true },
+        },
+        owners: {
+          select: {
+            person: {
+              select: {
+                id: true,
+                name: true,
+                nik: true,
+                email: true,
+                phone: true,
+                documentIdentity: {
+                  where: { application_id: id },
                 },
               },
-              share: true,
             },
+            share: true,
           },
         },
-      });
+      },
+    });
 
-      if (!application) {
-        throw new AppError("Permohonan tidak ditemukan", 200)
-      };
+    if (!application) {
+      throw new AppError("Permohonan tidak ditemukan", 200);
+    }
 
-      const payment = await tx.applicationPayment.findFirst({
-        where: {
-          application_id: application.id,
-          status: 'PENDING',
-        },
-        select: {
-          amount: true
-        }
-      });
+    const payment = await prisma.applicationPayment.findFirst({
+      where: {
+        application_id: application.id,
+        status: "PENDING",
+      },
+      select: {
+        amount: true,
+      },
+    });
 
-      return serializeBigInt({
-        ...application,
-        total_fee: application.total_fee,
-        owners: application.owners.map((o: any) => {
-          const { documentIdentity, ...person } = o.person;
+    return serializeBigInt({
+      ...application,
+      pending_payment_amount: payment?.amount ?? null,
+      owners: application.owners.map((o: any) => {
+        const { documentIdentity, ...person } = o.person;
 
-          return {
-            ...o,
-            person: {
-              ...person,
-              document: documentIdentity,
-            },
-          };
-        }),
-      });
+        return {
+          ...o,
+          person: {
+            ...person,
+            document: documentIdentity,
+          },
+        };
+      }),
     });
   } catch (error) {
     if (error instanceof AppError) {
       throw error;
     }
 
-    throw new AppError("Terjadi kesalahan saat mendapatkan data permohonan", 500, error)
+    throw new AppError(
+      "Terjadi kesalahan saat mendapatkan data permohonan",
+      500,
+      error,
+    );
   }
 };
 
@@ -234,8 +235,8 @@ export const searchApplication = async (
     const application = await prisma.application.findFirst({
       where: search
         ? {
-          file_number: search,
-        }
+            file_number: search,
+          }
         : {},
       include: {
         officer: {
@@ -352,7 +353,7 @@ export const submitApplication = async (
           registration_fee: landOffice.price.registration_fee,
           nib: data.nib,
           type: data.cert_type,
-          total_fee: finalTotalFee
+          total_fee: finalTotalFee,
         },
       });
 
@@ -394,61 +395,65 @@ export const updateApplicationStatus = async (
   note?: string,
 ) => {
   try {
-    // 1. Ambil data awal untuk validasi
-    const application = await prisma.application.findUnique({
-      where: { file_number: fileNumber },
-      select: {
-        id: true,
-        file_number: true,
-        total_fee: true,
-        status: true,
-      },
-    });
-
-    if (!application) {
-      throw new AppError("Permohonan tidak ditemukan", 404);
-    }
-
-    let paymentData: any = null;
-
-    if (status === ApplicationStatus.MENUNGGU_PEMBAYARAN) {
-      const payment = await createPayment(Number(application.total_fee));
-      if (!payment) {
-        throw new AppError("Pembayaran gagal dibuat", 400);
-      }
-      paymentData = payment;
-    }
-
-    if (paymentData) {
-      await prisma.applicationPayment.create({
-        data: {
-          application_id: application.id,
-          order_id: paymentData.order_id,
-          qr_url: paymentData.qr_url,
-          status: mapPaymentStatus(paymentData.status),
-          amount: Number(paymentData.amount),
+    return await prisma.$transaction(async (tx) => {
+      const application = await tx.application.findUnique({
+        where: { file_number: fileNumber },
+        select: {
+          id: true,
+          file_number: true,
+          total_fee: true,
+          status: true,
         },
       });
-    }
 
-    const updated = await prisma.application.update({
-      where: { file_number: fileNumber },
-      data: {
-        status,
-        notes: note ?? null,
-      },
+      if (!application) {
+        throw new AppError("Permohonan tidak ditemukan", 404);
+      }
+
+      let paymentData: any = null;
+
+      if (status === ApplicationStatus.MENUNGGU_PEMBAYARAN) {
+        paymentData = await createPayment(Number(application.total_fee));
+
+        if (!paymentData) {
+          throw new AppError("Pembayaran gagal dibuat", 400);
+        }
+      }
+
+      if (paymentData) {
+        await tx.applicationPayment.create({
+          data: {
+            application_id: application.id,
+            order_id: paymentData.order_id,
+            qr_url: paymentData.qr_url,
+            status: mapPaymentStatus(paymentData.status),
+            amount: Number(paymentData.amount),
+          },
+        });
+      }
+
+      const updated = await tx.application.update({
+        where: { file_number: fileNumber },
+        data: {
+          status,
+          notes: note ?? null,
+        },
+      });
+
+      return serializeBigInt({
+        updated,
+      });
     });
-
-    return updated;
   } catch (error) {
-    console.log("error : ", error);
+    console.log("error :", error);
+
     if (error instanceof AppError) {
       throw error;
     }
+
     throw new AppError("Gagal memproses permohonan", 500);
   }
 };
-
 
 export const updateApplication = async (
   applicationId: string,
@@ -457,148 +462,146 @@ export const updateApplication = async (
 ) => {
   const filesToDelete: string[] = [];
 
-  const result = await prisma.$transaction(
-    async (tx: any) => {
-      const application = await tx.application.findUnique({
-        where: {
-          id: applicationId,
-        },
-      });
+  const result = await prisma.$transaction(async (tx: any) => {
+    const application = await tx.application.findUnique({
+      where: {
+        id: applicationId,
+      },
+    });
 
-      if (!application) {
-        throw new AppError("Permohonan tidak ditemukan", 404);
-      }
+    if (!application) {
+      throw new AppError("Permohonan tidak ditemukan", 404);
+    }
 
-      // ======================
-      // UPDATE APPLICATION
-      // ======================
+    // ======================
+    // UPDATE APPLICATION
+    // ======================
 
-      const updateData = Object.fromEntries(
-        Object.entries({
-          person_id: data.person_id,
-          land_id: data.land_id,
-          cert_code: data.cert_code,
-          type: data.cert_type,
-          nib: data.nib,
-          officer_id: data.officer_id,
-          land_office_id: data.land_office_id,
-        }).filter(([_, value]) => value !== undefined),
-      );
+    const updateData = Object.fromEntries(
+      Object.entries({
+        person_id: data.person_id,
+        land_id: data.land_id,
+        cert_code: data.cert_code,
+        type: data.cert_type,
+        nib: data.nib,
+        officer_id: data.officer_id,
+        land_office_id: data.land_office_id,
+      }).filter(([_, value]) => value !== undefined),
+    );
 
-      await tx.application.update({
-        where: {
-          id: applicationId,
-        },
-        data: updateData,
-      });
+    await tx.application.update({
+      where: {
+        id: applicationId,
+      },
+      data: updateData,
+    });
 
-      // ======================
-      // UPSERT OWNERS
-      // ======================
+    // ======================
+    // UPSERT OWNERS
+    // ======================
 
-      if ((data.owners ?? []).length > 0) {
-        await Promise.all(
-          (data.owners ?? []).map((owner) =>
-            tx.applicationOwner.upsert({
-              where: {
-                application_id_person_id: {
-                  application_id: applicationId,
-                  person_id: owner.person_id,
-                },
-              },
-              update: {
-                share: owner.share,
-              },
-              create: {
+    if ((data.owners ?? []).length > 0) {
+      await Promise.all(
+        (data.owners ?? []).map((owner) =>
+          tx.applicationOwner.upsert({
+            where: {
+              application_id_person_id: {
                 application_id: applicationId,
                 person_id: owner.person_id,
-                share: owner.share,
               },
-            }),
-          ),
-        );
-      }
-
-      // ======================
-      // MAP DOCUMENTS
-      // ======================
-
-      const documents = AppDocumentService.mapApplicationDocuments(
-        applicationId,
-        data,
-      );
-
-      // ======================
-      // UPSERT DOCUMENTS
-      // ======================
-
-      if (documents.length > 0) {
-        await Promise.all(
-          documents.map(async (document) => {
-            const existingDocument = await tx.applicationDocument.findFirst({
-              where: {
-                application_id: applicationId,
-                person_id: document.person_id,
-                type: document.type,
-              },
-            });
-
-            // simpan file lama untuk dihapus
-            if (existingDocument?.fileUrl) {
-              filesToDelete.push(existingDocument.fileUrl);
-            }
-
-            await tx.applicationDocument.upsert({
-              where: {
-                application_id_person_id_type: {
-                  application_id: applicationId,
-                  person_id: document.person_id,
-                  type: document.type,
-                },
-              },
-              update: {
-                fileUrl: document.fileUrl,
-                fileName: document.fileName,
-                mimeType: document.mimeType,
-                fileSize: document.fileSize,
-              },
-              create: {
-                application_id: applicationId,
-                person_id: document.person_id,
-                type: document.type,
-                fileName: document.fileName,
-                fileUrl: document.fileUrl,
-                mimeType: document.mimeType,
-                fileSize: document.fileSize,
-              },
-            });
-          }),
-        );
-      }
-
-      moveTempFolder(tempFolder, `applications/${application.id}`);
-
-      // ======================
-      // GET FINAL RESULT
-      // ======================
-
-      const updatedApplication = await tx.application.findUnique({
-        where: {
-          id: applicationId,
-        },
-        include: {
-          owners: {
-            include: {
-              person: true,
             },
-          },
-          document: true,
-        },
-      });
+            update: {
+              share: owner.share,
+            },
+            create: {
+              application_id: applicationId,
+              person_id: owner.person_id,
+              share: owner.share,
+            },
+          }),
+        ),
+      );
+    }
 
-      return updatedApplication;
-    },
-  );
+    // ======================
+    // MAP DOCUMENTS
+    // ======================
+
+    const documents = AppDocumentService.mapApplicationDocuments(
+      applicationId,
+      data,
+    );
+
+    // ======================
+    // UPSERT DOCUMENTS
+    // ======================
+
+    if (documents.length > 0) {
+      await Promise.all(
+        documents.map(async (document) => {
+          const existingDocument = await tx.applicationDocument.findFirst({
+            where: {
+              application_id: applicationId,
+              person_id: document.person_id,
+              type: document.type,
+            },
+          });
+
+          // simpan file lama untuk dihapus
+          if (existingDocument?.fileUrl) {
+            filesToDelete.push(existingDocument.fileUrl);
+          }
+
+          await tx.applicationDocument.upsert({
+            where: {
+              application_id_person_id_type: {
+                application_id: applicationId,
+                person_id: document.person_id,
+                type: document.type,
+              },
+            },
+            update: {
+              fileUrl: document.fileUrl,
+              fileName: document.fileName,
+              mimeType: document.mimeType,
+              fileSize: document.fileSize,
+            },
+            create: {
+              application_id: applicationId,
+              person_id: document.person_id,
+              type: document.type,
+              fileName: document.fileName,
+              fileUrl: document.fileUrl,
+              mimeType: document.mimeType,
+              fileSize: document.fileSize,
+            },
+          });
+        }),
+      );
+    }
+
+    moveTempFolder(tempFolder, `applications/${application.id}`);
+
+    // ======================
+    // GET FINAL RESULT
+    // ======================
+
+    const updatedApplication = await tx.application.findUnique({
+      where: {
+        id: applicationId,
+      },
+      include: {
+        owners: {
+          include: {
+            person: true,
+          },
+        },
+        document: true,
+      },
+    });
+
+    return updatedApplication;
+  });
 
   // ======================
   // DELETE OLD FILES
@@ -628,14 +631,17 @@ export const updateApplication = async (
   );
 };
 
-export const enqueueCertificateGeneration = async (applicationId: string, notes: string[]) => {
+export const enqueueCertificateGeneration = async (
+  applicationId: string,
+  notes: string[],
+) => {
   try {
     const isSuccess = await prisma.application.update({
       where: {
         id: applicationId,
       },
       data: {
-        status: "PENERBITAN_SERTIFIKAT",
+        status: "PROSES_PENERBITAN",
       },
       select: {
         file_number: true,
@@ -672,113 +678,124 @@ export const getApplicationPayment = async (id: string) => {
           select: {
             person: {
               select: {
-                name: true
-              }
-            }
-          }
+                name: true,
+              },
+            },
+          },
         },
         landOffice: {
           select: {
             name: true,
             address: true,
             email: true,
-            phone: true
+            phone: true,
           },
-        }
+        },
       },
     });
 
     if (!application) {
-      return new AppError('permohonan tidak ditemukan', 200)
+      return new AppError("permohonan tidak ditemukan", 200);
     }
 
     return serializeBigInt({
-      application
+      application,
     });
   } catch (error: unknown) {
     if (error instanceof AppError) {
-      throw error
+      throw error;
     }
 
-    throw new AppError("Terjadi kesalahan saat mengambil data permohonan", 500)
+    throw new AppError("Terjadi kesalahan saat mengambil data permohonan", 500);
   }
 };
 
-export const getMidtransNotification = async (notification: MidtransNotification) => {
+export const getMidtransNotification = async (
+  notification: MidtransNotification,
+) => {
   try {
     if (!notification) {
-      throw new AppError('Tidak ada notifikasi yang dikirimkan', 400)
+      throw new AppError("Tidak ada notifikasi yang dikirimkan", 400);
     }
 
-    const { transaction_status, order_id } = await isValidNotification(notification)
+    const { transaction_status, order_id } =
+      await isValidNotification(notification);
 
-    if (transaction_status === 'settlement') {
+    if (transaction_status === "settlement") {
       console.log(`Transaksi ${order_id} BERHASIL dibayar.`);
       await prisma.$transaction(async (tx) => {
         const paymentApp = await tx.applicationPayment.update({
           where: {
-            order_id
+            order_id,
           },
           data: {
-            status: 'SUCCESS',
-            paidAt: new Date()
+            status: "SUCCESS",
+            paidAt: new Date(),
           },
           select: {
-            application_id: true
-          }
-        })
+            application_id: true,
+          },
+        });
 
         await tx.application.update({
           where: {
-            id: paymentApp.application_id
+            id: paymentApp.application_id,
           },
           data: {
-            status: 'VERIFIKASI_PEMBAYARAN',
-            updatedAt: new Date()
-          }
-        })
-      })
-    } else if (['refund', 'expire'].includes(transaction_status)) {
+            status: "VERIFIKASI_PEMBAYARAN",
+            updatedAt: new Date(),
+          },
+        });
+      });
+    } else if (["refund", "expire"].includes(transaction_status)) {
       console.log(`Transaksi ${order_id} GAGAL/BATAL.`);
       let paymentStatus: PaymentStatus;
-      if (transaction_status === 'expire') {
-        paymentStatus = 'EXPIRED'
-      } else if (transaction_status === 'refund') {
-        paymentStatus = 'REFUND'
+      if (transaction_status === "expire") {
+        paymentStatus = "EXPIRED";
+      } else if (transaction_status === "refund") {
+        paymentStatus = "REFUND";
       } else {
-        paymentStatus = 'EXPIRED'
+        paymentStatus = "EXPIRED";
       }
 
       await prisma.$transaction(async (tx) => {
         const paymentApp = await tx.applicationPayment.update({
           where: {
-            order_id
+            order_id,
           },
           data: {
             status: paymentStatus,
           },
           select: {
-            application_id: true
-          }
-        })
+            application_id: true,
+          },
+        });
 
         await tx.application.update({
           where: {
-            id: paymentApp.application_id
+            id: paymentApp.application_id,
           },
           data: {
-            status: paymentStatus === 'EXPIRED' ? 'PEMBAYARAN_KADALUARSA' : paymentStatus === 'REFUND' ? 'PEMBAYARAN_DIKEMBALIKAN' : 'TERJADI_KESALAHAN',
-            updatedAt : new Date()
-          }
-        })
-      })
-
+            status:
+              paymentStatus === "EXPIRED"
+                ? "PEMBAYARAN_KADALUARSA"
+                : paymentStatus === "REFUND"
+                  ? "PEMBAYARAN_DIKEMBALIKAN"
+                  : "TERJADI_KESALAHAN",
+            updatedAt: new Date(),
+          },
+        });
+      });
     }
   } catch (error: any) {
     if (error instanceof AppError) {
-      throw error
+      throw error;
     }
 
-    throw new AppError('Terjadi kesalahan saat mengirim notifikasi', 500, error)
+    throw new AppError(
+      "Terjadi kesalahan saat mengirim notifikasi",
+      500,
+      error,
+    );
   }
-}
+};

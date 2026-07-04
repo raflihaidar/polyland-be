@@ -8,11 +8,7 @@ import { verifyMessage, keccak256, toBytes } from "viem";
 import { REFRESH_TOKEN_SECRET, ACCESS_TOKEN_SECRET } from "../config/token.js";
 import jwt from "jsonwebtoken";
 import { AppError } from "../utils/error.js";
-import {
-  publicClient,
-  walletClient,
-  contractConfig,
-} from "../config/wallet.js";
+import { publicClient, contractConfig } from "../config/wallet.js";
 import { Prisma } from "@prisma/client/extension";
 
 const CITIZEN_ROLE = keccak256(toBytes("CITIZEN_ROLE"));

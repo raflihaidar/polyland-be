@@ -169,7 +169,7 @@ export async function createQueue(input: CreateQueueInput) {
     const queue = await prisma.$transaction(async (tx: any) => {
       const queueNumber = await nextQueueNumber(tx, loketId, date);
 
-      return tx.queue.create({
+      return await tx.queue.create({
         data: {
           loket: {
             connect: {

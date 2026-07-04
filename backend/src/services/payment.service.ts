@@ -1,35 +1,45 @@
 import { coreApi } from "../config/midtrans.js";
 import { MidtransNotification } from "../types/domain/payment.type.js";
 import { AppError } from "../utils/error.js";
-import crypto from 'crypto';
+import { Xendit } from "xendit-node";
+import { xenditPaymentRequestClient } from "../config/xendit.js";
+
+import crypto from "crypto";
 import axios from "axios";
 
-
-export const isValidNotification = async (notification : MidtransNotification) => {
+export const isValidNotification = async (
+  notification: MidtransNotification,
+) => {
   try {
-    const { order_id, status_code, gross_amount, signature_key, transaction_status } = notification;
+    const {
+      order_id,
+      status_code,
+      gross_amount,
+      signature_key,
+      transaction_status,
+    } = notification;
 
     const stringToHash = `${order_id}${status_code}${gross_amount}${process.env.MIDTRANS_SERVER_KEY}`;
     const localSignature = crypto
-      .createHash('sha512')
+      .createHash("sha512")
       .update(stringToHash)
-      .digest('hex');
+      .digest("hex");
 
     if (localSignature !== signature_key) {
-       throw new AppError('Invalid Signature Key', 400)
+      throw new AppError("Invalid Signature Key", 400);
     }
 
     return {
-       transaction_status,
-       order_id
-    }
+      transaction_status,
+      order_id,
+    };
   } catch (error) {
-    if(error instanceof AppError){
-      throw error
+    if (error instanceof AppError) {
+      throw error;
     }
-    throw new AppError("Error saat mendapatkan notifikasi dari midtrans", 500)
+    throw new AppError("Error saat mendapatkan notifikasi dari midtrans", 500);
   }
-}
+};
 
 export const createPayment = async (amount: number) => {
   try {
@@ -43,7 +53,7 @@ export const createPayment = async (amount: number) => {
 
     const res = await coreApi.charge(chargeParameter);
 
-    if(!res) return null
+    if (!res) return null;
 
     const invoice = {
       status_code: res.status_code,
@@ -55,8 +65,7 @@ export const createPayment = async (amount: number) => {
       expiry_time: res.expiry_time,
     };
 
-
-    console.log("invoice : ", invoice)
+    console.log("invoice : ", invoice);
 
     return invoice;
   } catch (err: any) {
@@ -119,3 +128,30 @@ export const cancelPayment = async (orderId: string) => {
     throw error;
   }
 };
+
+// export const createPayment = async (amount: number) => {
+//   try {
+//     const response = await xenditPaymentRequestClient.createPaymentRequest({
+//       data: {
+//         amount,
+//         currency: "IDR",
+//         referenceId: `ORDER-${Date.now()}`,
+//         paymentMethod: {
+//           qrCode: {
+//             channelCode: "QRIS",
+//           },
+//           reusability: "ONE_TIME_USE",
+//           type: "QR_CODE",
+//         },
+//       },
+//     });
+
+//     console.log("QRIS Payment Request Successful:", response);
+
+//     console.dir(response, { depth: null });
+
+//     return response;
+//   } catch (error) {
+//     console.error("Error creating QRIS payment:", error);
+//   }
+// };
