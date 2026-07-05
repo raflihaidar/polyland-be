@@ -27,7 +27,7 @@ router.get(
   getListApplication,
 );
 router.get(
-  "/payment-detail/:id",
+  "/payment-detail/:order_id",
   authorize("peralihan-hak", "read"),
   getApplicationPayment,
 );

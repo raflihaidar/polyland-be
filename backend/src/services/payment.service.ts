@@ -1,11 +1,10 @@
 import { coreApi } from "../config/midtrans.js";
 import { MidtransNotification } from "../types/domain/payment.type.js";
 import { AppError } from "../utils/error.js";
-import { Xendit } from "xendit-node";
-import { xenditPaymentRequestClient } from "../config/xendit.js";
 
 import crypto from "crypto";
 import axios from "axios";
+import { PaymentStatus } from "../generated/prisma/enums.js";
 
 export const isValidNotification = async (
   notification: MidtransNotification,
@@ -74,6 +73,26 @@ export const createPayment = async (amount: number) => {
   }
 };
 
+const mapMidtransStatus = (transactionStatus: string): PaymentStatus => {
+  switch (transactionStatus) {
+    case "pending":
+      return PaymentStatus.PENDING
+    case "capture":
+    case "settlement":
+      return PaymentStatus.SUCCESS
+    case "expire":
+      return PaymentStatus.EXPIRED
+    case "cancel":
+    case "deny":
+      return PaymentStatus.CANCELED
+    case "refund":
+    case "partial_refund":
+      return PaymentStatus.REFUND
+    default:
+      return PaymentStatus.PENDING
+  }
+}
+
 export const getPaymentStatus = async (orderId: string) => {
   try {
     const { data } = await axios.get(
@@ -85,15 +104,12 @@ export const getPaymentStatus = async (orderId: string) => {
         },
       },
     );
-
     const res = data;
-
     const payment = {
-      status: res.transaction_status,
+      status: mapMidtransStatus(res.transaction_status),
       amount: res.gross_amount,
       created_at: res.transaction_time,
     };
-
     return payment;
   } catch (error: any) {
     console.error(error.response?.data);

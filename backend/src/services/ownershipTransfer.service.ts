@@ -235,8 +235,8 @@ export const searchApplication = async (
     const application = await prisma.application.findFirst({
       where: search
         ? {
-            file_number: search,
-          }
+          file_number: search,
+        }
         : {},
       include: {
         officer: {
@@ -249,6 +249,16 @@ export const searchApplication = async (
             id: true,
             name: true,
           },
+        },
+        payments: {
+          orderBy: {
+            createdAt: "desc",
+          },
+          select: {
+            paidAt : true,
+            order_id: true
+          },
+          take: 1,
         },
         landOffice: {
           select: {
@@ -265,13 +275,18 @@ export const searchApplication = async (
     if (!application) return null;
 
     const isOwner = application.person_id === currentUserId;
+    
+    const { payments, ...result } = application;
 
-    return {
-      ...application,
+    const data = {
+      ...result,
       total_fee: Number(application.total_fee),
       canPay:
         isOwner && application.status === ApplicationStatus.MENUNGGU_PEMBAYARAN,
+      payment: payments[0] ?? null,
     };
+
+    return data
   } catch (error) {
     throw new AppError("Gagal mengambil data application", 500);
   }
@@ -428,6 +443,7 @@ export const updateApplicationStatus = async (
             qr_url: paymentData.qr_url,
             status: mapPaymentStatus(paymentData.status),
             amount: Number(paymentData.amount),
+            expireAt: new Date(paymentData.expiry_time)
           },
         });
       }
@@ -665,41 +681,31 @@ export const enqueueCertificateGeneration = async (
   }
 };
 
-export const getApplicationPayment = async (id: string) => {
+export const getApplicationPayment = async (order_id: string) => {
   try {
-    let application = await prisma.application.findUnique({
+    let paymentDetail = await prisma.applicationPayment.findUnique({
       where: {
-        id,
+        order_id
       },
       select: {
         id: true,
+        order_id: true,
+        expireAt: true,
         createdAt: true,
-        owners: {
+        status: true,
+        qr_url: true,
+        amount: true,
+        application: {
           select: {
-            person: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-        landOffice: {
-          select: {
-            name: true,
-            address: true,
-            email: true,
-            phone: true,
-          },
-        },
-      },
-    });
-
-    if (!application) {
-      return new AppError("permohonan tidak ditemukan", 200);
-    }
+            id: true,
+            file_number: true,
+          }
+        }
+      }
+    })
 
     return serializeBigInt({
-      application,
+      data: paymentDetail,
     });
   } catch (error: unknown) {
     if (error instanceof AppError) {

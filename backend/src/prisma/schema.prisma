@@ -383,6 +383,7 @@ model ApplicationPayment {
   amount         BigInt        @default(0)
 
   paidAt    DateTime?
+  expireAt  DateTime
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now())
 

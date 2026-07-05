@@ -70,18 +70,18 @@ export const getApplicationPayment = async (
   next: NextFunction,
 ) => {
   try {
-    const { id } = req.params;
+    const { order_id } = req.params;
 
-    if (!id) throw new AppError("Invoice Pembayaran tidak ditemukan", 404);
+    if (!order_id) throw new AppError("Tagihan Pembayaran tidak ditemukan", 404);
 
-    const result = await ownershipService.getApplicationPayment(id as string);
+    const result = await ownershipService.getApplicationPayment(order_id as string);
 
     if (!result)
-      throw new AppError("Invoice Pembayaran tidak ditemukan", 404, {});
+      throw new AppError("Tagihan Pembayaran tidak ditemukan", 404, {});
 
     res.status(200).json({
-      message: "Invoice pembayaran berhasil didapatkan",
-      data: result,
+      message: "Tagihan pembayaran berhasil didapatkan",
+      data: result.data,
     });
   } catch (error) {
     next(error);
@@ -487,8 +487,6 @@ export const getPaymentStatus = async (
     const { order_id } = req.params;
 
     if (!order_id) throw new AppError("Pembayaran tidak ditemukan", 404);
-
-    console.log("order id controler : ", order_id);
 
     const result = await paymentService.getPaymentStatus(order_id as string);
 
