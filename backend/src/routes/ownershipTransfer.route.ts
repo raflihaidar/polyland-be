@@ -1,5 +1,8 @@
 import express from "express";
 import {
+  getDashboardSummary,
+  getDistribusiStatusPermohonan,
+  getBlockchainSummary,
   getListApplication,
   getApplication,
   getApplicationPayment,
@@ -21,6 +24,24 @@ const router = express.Router();
 router.use(authentication);
 
 router.get("/", authorize("peralihan-hak", "read"), searchApplication);
+router.get(
+  "/dashboard/summary/:office_id",
+  authorize("peralihan-hak", "read"),
+  getDashboardSummary,
+);
+
+router.get(
+  "/dashboard/distribusi-status/:office_id",
+  authorize("peralihan-hak", "read"),
+  getDistribusiStatusPermohonan,
+);
+
+router.get(
+  "/dashboard/blockchain-summary/:office_id",
+  authorize("peralihan-hak", "read"),
+  getBlockchainSummary,
+);
+
 router.get(
   "/:land_office_id",
   authorize("peralihan-hak", "read"),

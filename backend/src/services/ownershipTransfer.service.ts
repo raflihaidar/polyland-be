@@ -5,11 +5,6 @@ import {
   ApplicationCreate,
   ApplicationUpdate,
 } from "../types/domain/ownershipTransfer.type.js";
-import {
-  ApplicationStatus,
-  CertificateType,
-  PaymentStatus,
-} from "../generated/prisma/enums.js";
 import * as fileCounterService from "./fileCounter.service.js";
 import * as landService from "./land.service.js";
 import * as AppDocumentService from "./applicationDocument.service.js";
@@ -20,7 +15,187 @@ import { moveTempFolder } from "../utils/file.js";
 import path from "path";
 import { createPayment, isValidNotification } from "./payment.service.js";
 import { MidtransNotification } from "../types/domain/payment.type.js";
-import { tryCatch } from "bullmq";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc.js";
+import timezone from "dayjs/plugin/timezone.js";
+import {
+  ApplicationStatus,
+  CertificateType,
+  CertificateStatus,
+  MintingStatus,
+  PaymentStatus,
+} from "../generated/prisma/enums.js";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+export const getDashboardSummary = async (land_office_id: string) => {
+  try {
+    if (!land_office_id) {
+      throw new AppError("Kantor pertanahan tidak ditemukan", 400);
+    }
+
+    // Validasi land_office_id ada di database
+    const landOffice = await prisma.landOffice.findUnique({
+      where: { id: land_office_id },
+      select: { id: true },
+    });
+
+    if (!landOffice) {
+      throw new AppError("Kantor pertanahan tidak ditemukan", 404);
+    }
+
+    const startOfMonth = dayjs()
+      .tz("Asia/Jakarta")
+      .startOf("month")
+      .utc()
+      .toDate();
+    const endOfMonth = dayjs().tz("Asia/Jakarta").endOf("month").utc().toDate();
+
+    const [total, menungguVerifikasi, dalamProses, selesaiBulanIni] =
+      await Promise.all([
+        prisma.application.count({
+          where: { land_office_id },
+        }),
+        prisma.application.count({
+          where: {
+            land_office_id,
+            status: {
+              in: [
+                ApplicationStatus.VERIFIKASI_BERKAS,
+                ApplicationStatus.VERIFIKASI_PEMBAYARAN,
+              ],
+            },
+          },
+        }),
+        prisma.application.count({
+          where: {
+            land_office_id,
+            status: {
+              in: [
+                ApplicationStatus.MENUNGGU_PEMBAYARAN,
+                ApplicationStatus.PROSES_PENERBITAN,
+              ],
+            },
+          },
+        }),
+        prisma.application.count({
+          where: {
+            land_office_id,
+            status: ApplicationStatus.SELESAI,
+            updatedAt: {
+              gte: startOfMonth,
+              lte: endOfMonth,
+            },
+          },
+        }),
+      ]);
+
+    return {
+      total_permohonan: total,
+      menunggu_verifikasi: menungguVerifikasi,
+      dalam_proses: dalamProses,
+      selesai_bulan_ini: selesaiBulanIni,
+    };
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError("Gagal mengambil ringkasan dashboard", 500, error);
+  }
+};
+
+export const getDistribusiStatusPermohonan = async (land_office_id: string) => {
+  try {
+    if (!land_office_id) {
+      throw new AppError("Kantor pertanahan tidak ditemukan", 500);
+    }
+
+    const grouped = await prisma.application.groupBy({
+      by: ["status"],
+      where: { land_office_id },
+      _count: {
+        status: true,
+      },
+    });
+
+    const allStatuses = Object.values(ApplicationStatus);
+
+    const distribusi = allStatuses.map((status) => {
+      const found = grouped.find((g: any) => g.status === status);
+
+      return {
+        status,
+        jumlah: found ? found._count.status : 0,
+      };
+    });
+
+    return { data: distribusi };
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(
+      "Gagal mengambil distribusi status permohonan",
+      500,
+      error,
+    );
+  }
+};
+
+export const getBlockchainSummary = async (land_office_id: string) => {
+  try {
+    if (!land_office_id) {
+      throw new AppError("Kantor pertanahan tidak ditemukan", 400);
+    }
+
+    // Validasi land_office_id ada di database
+    const landOffice = await prisma.landOffice.findUnique({
+      where: { id: land_office_id },
+      select: { id: true },
+    });
+
+    if (!landOffice) {
+      throw new AppError("Kantor pertanahan tidak ditemukan", 404);
+    }
+
+    const [totalVerified, totalOnChain] = await Promise.all([
+      prisma.certificate.count({
+        where: {
+          status: CertificateStatus.AKTIF,
+          applications: {
+            some: { land_office_id },
+          },
+        },
+      }),
+      prisma.certificate.count({
+        where: {
+          minting_status: MintingStatus.SUCCESS,
+          applications: {
+            some: { land_office_id },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      total_verified: totalVerified,
+      total_on_chain: totalOnChain,
+    };
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(
+      "Gagal mengambil ringkasan status blockchain",
+      500,
+      error,
+    );
+  }
+};
 
 export const getListApplication = async (
   land_office_id: string,
@@ -42,12 +217,6 @@ export const getListApplication = async (
       land_office_id,
       ...(status && { status: status as ApplicationStatus }),
       ...(type && { type: type as CertificateType }),
-      ...(date && {
-        createdAt: {
-          gte: new Date(`${date}T00:00:00.000Z`),
-          lte: new Date(`${date}T23:59:59.999Z`),
-        },
-      }),
       ...(search && {
         OR: [
           {
@@ -75,6 +244,20 @@ export const getListApplication = async (
         ],
       }),
     };
+
+    if (date) {
+      const start = dayjs.tz(`${date} 00:00:00`, "Asia/Jakarta").utc().toDate();
+
+      const end = dayjs
+        .tz(`${date} 23:59:59.999`, "Asia/Jakarta")
+        .utc()
+        .toDate();
+
+      where.createdAt = {
+        gte: start,
+        lte: end,
+      };
+    }
 
     const [data, total] = await Promise.all([
       prisma.application.findMany({
@@ -235,8 +418,8 @@ export const searchApplication = async (
     const application = await prisma.application.findFirst({
       where: search
         ? {
-          file_number: search,
-        }
+            file_number: search,
+          }
         : {},
       include: {
         officer: {
@@ -255,8 +438,8 @@ export const searchApplication = async (
             createdAt: "desc",
           },
           select: {
-            paidAt : true,
-            order_id: true
+            paidAt: true,
+            order_id: true,
           },
           take: 1,
         },
@@ -275,7 +458,7 @@ export const searchApplication = async (
     if (!application) return null;
 
     const isOwner = application.person_id === currentUserId;
-    
+
     const { payments, ...result } = application;
 
     const data = {
@@ -286,7 +469,7 @@ export const searchApplication = async (
       payment: payments[0] ?? null,
     };
 
-    return data
+    return data;
   } catch (error) {
     throw new AppError("Gagal mengambil data application", 500);
   }
@@ -443,7 +626,7 @@ export const updateApplicationStatus = async (
             qr_url: paymentData.qr_url,
             status: mapPaymentStatus(paymentData.status),
             amount: Number(paymentData.amount),
-            expireAt: new Date(paymentData.expiry_time)
+            expireAt: new Date(paymentData.expiry_time),
           },
         });
       }
@@ -685,7 +868,7 @@ export const getApplicationPayment = async (order_id: string) => {
   try {
     let paymentDetail = await prisma.applicationPayment.findUnique({
       where: {
-        order_id
+        order_id,
       },
       select: {
         id: true,
@@ -699,10 +882,10 @@ export const getApplicationPayment = async (order_id: string) => {
           select: {
             id: true,
             file_number: true,
-          }
-        }
-      }
-    })
+          },
+        },
+      },
+    });
 
     return serializeBigInt({
       data: paymentDetail,

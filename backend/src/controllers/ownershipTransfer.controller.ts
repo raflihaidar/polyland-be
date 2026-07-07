@@ -11,6 +11,78 @@ import fs from "fs";
 import path from "path";
 import { MidtransNotification } from "../types/domain/payment.type.js";
 
+export const getDashboardSummary = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { office_id } = req.params;
+
+    if (!office_id)
+      throw new AppError("Kantor pertanahan tidak ditemukan", 404);
+
+    const result = await ownershipService.getDashboardSummary(
+      office_id as string,
+    );
+
+    res.status(200).json({
+      message: "Ringkasan dashboard berhasil didapatkan",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getDistribusiStatusPermohonan = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { office_id } = req.params;
+
+    if (!office_id)
+      throw new AppError("Kantor pertanahan tidak ditemukan", 404);
+
+    const result = await ownershipService.getDistribusiStatusPermohonan(
+      office_id as string,
+    );
+
+    res.status(200).json({
+      message: "Distribusi status permohonan berhasil didapatkan",
+      data: result.data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getBlockchainSummary = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { office_id } = req.params;
+
+    if (!office_id)
+      throw new AppError("Kantor pertanahan tidak ditemukan", 404);
+
+    const result = await ownershipService.getBlockchainSummary(
+      office_id as string,
+    );
+
+    res.status(200).json({
+      message: "Ringkasan status blockchain berhasil didapatkan",
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getListApplication = async (
   req: Request,
   res: Response,
@@ -72,9 +144,12 @@ export const getApplicationPayment = async (
   try {
     const { order_id } = req.params;
 
-    if (!order_id) throw new AppError("Tagihan Pembayaran tidak ditemukan", 404);
+    if (!order_id)
+      throw new AppError("Tagihan Pembayaran tidak ditemukan", 404);
 
-    const result = await ownershipService.getApplicationPayment(order_id as string);
+    const result = await ownershipService.getApplicationPayment(
+      order_id as string,
+    );
 
     if (!result)
       throw new AppError("Tagihan Pembayaran tidak ditemukan", 404, {});

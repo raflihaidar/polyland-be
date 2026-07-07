@@ -286,6 +286,7 @@ export const getCertificateById = async (
             status: true,
             cid: true,
             label: true,
+            token_id: true,
             owners: {
               select: {
                 ownership_pct: true,
@@ -321,6 +322,7 @@ export const getCertificateById = async (
       cid: data.certificate.cid,
       createdAt: data.createdAt,
       label: data.certificate.label,
+      token_id: data.certificate.token_id,
 
       owners: data.certificate.owners.map((owner: any) => ({
         name: owner.person?.name,
