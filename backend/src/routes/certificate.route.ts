@@ -1,6 +1,5 @@
 import express from "express";
 import {
-  generateCertificate,
   getCertificates,
   getDetailCertificate,
   verifyCertificate,
@@ -25,10 +24,5 @@ router.get(
   getDetailCertificate,
 );
 router.put("/:id", authorize("sertipikatku", "update"), updateLabelCertificate);
-router.post(
-  "/generate",
-  authorize("sertipikatku", "create"),
-  generateCertificate,
-);
 
 export default router;

@@ -1142,8 +1142,7 @@ export const enqueueCertificateGeneration = async (
         },
       ],
       functionName: "eip712Domain",
-    });
-    console.log(domain);
+    } as any);
 
     const currentNonce = await getForwarderNonce(normalizedRequest.from);
     console.log("nonce saat verify:", currentNonce.toString());

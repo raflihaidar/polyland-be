@@ -29,32 +29,6 @@ export const searchCertificate = async (
   }
 };
 
-export const generateCertificate = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const { fileNumber, notes } = req.body;
-
-    if (!fileNumber) throw new AppError("nomor file tidak ditemukan", 400);
-
-    const buffer = await CertificateService.generateCertificate(
-      fileNumber as string,
-      notes as string[],
-    );
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "attachment; filename=certificate.pdf",
-    });
-
-    res.send(buffer);
-  } catch (error: unknown) {
-    next(error);
-  }
-};
-
 export const getCertificates = async (
   req: Request,
   res: Response,

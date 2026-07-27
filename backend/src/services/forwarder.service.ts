@@ -63,7 +63,7 @@ export const getForwarderNonce = async (address: Address): Promise<bigint> => {
     ...forwarderConfig,
     functionName: "nonces",
     args: [address],
-  })) as bigint;
+  } as any)) as bigint;
 };
 
 /**
@@ -122,5 +122,5 @@ export const verifyForwardRequest = async (
     ...forwarderConfig,
     functionName: "verify",
     args: [requestData],
-  })) as boolean;
+  } as any)) as boolean;
 };

@@ -3,6 +3,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { polygonAmoy } from "viem/chains";
 import { CertificateABI } from "../abi/certificateNFT.js";
 import { ForwarderABI } from "../abi/forwarder.js";
+import type { Address } from "viem";
 
 const RPC_URL = process.env.RPC_URL;
 const WS_RPC_URL = process.env.RPC_WS_URL;
@@ -36,12 +37,12 @@ export const walletClient = createWalletClient({
 });
 
 export const contractConfig = {
-  address: CONTRACT_ADDRESS as `0x${string}`,
+  address: CONTRACT_ADDRESS as Address,
   abi: CertificateABI,
 } as const;
 
 export const forwarderConfig = {
-  address: FORWARDER_CONTRACT_ADDRESS as `0x${string}`,
+  address: FORWARDER_CONTRACT_ADDRESS as Address,
   abi: ForwarderABI,
 } as const;
 

@@ -541,18 +541,25 @@ export const updateApplication = async (
     const { id: officerId } = req.person;
     const { id } = req.params;
     const tempFolder = req.body._tempFolder;
-    // console.log("temp folder : ", tempFolder);
 
-    const files = req.files as {
-      cert_file?: Express.Multer.File[];
-      ktp_penjual?: Express.Multer.File[];
-      kk_pembeli?: Express.Multer.File[];
-      ktp_pembeli?: Express.Multer.File[];
-      akta_jual_beli?: Express.Multer.File[];
-      fc_sppt?: Express.Multer.File[];
-      fc_pbb?: Express.Multer.File[];
-      ssb?: Express.Multer.File[];
-    };
+    const files = req.files as
+      | {
+          ktp_penjual?: Express.Multer.File[];
+          kk_penjual?: Express.Multer.File[];
+          npwp_penjual?: Express.Multer.File[];
+          surat_nikah_penjual?: Express.Multer.File[];
+
+          ktp_pembeli?: Express.Multer.File[];
+          npwp_pembeli?: Express.Multer.File[];
+          kk_pembeli?: Express.Multer.File[];
+          surat_nikah_pembeli?: Express.Multer.File[];
+
+          akta_jual_beli?: Express.Multer.File[];
+          sppt_pbb?: Express.Multer.File[];
+          bphtb?: Express.Multer.File[];
+          pph?: Express.Multer.File[];
+        }
+      | undefined;
 
     // ======================
     // PARSE OWNERS
@@ -562,10 +569,10 @@ export const updateApplication = async (
       ? req.body.owners
       : req.body.owners
         ? JSON.parse(req.body.owners)
-        : [];
+        : undefined;
 
     // ======================
-    // PERSON IDS FOR FILES
+    // PERSON IDS
     // ======================
 
     const ktpPembeliPersonIds = Array.isArray(req.body.ktp_pembeli_person_ids)
@@ -590,8 +597,15 @@ export const updateApplication = async (
     // BODY
     // ======================
 
-    const { land_office_id, cert_code, cert_type, nib, land_id, person_id } =
-      req.body;
+    const {
+      land_office_id,
+      cert_code,
+      cert_type,
+      nib,
+      land_id,
+      person_id,
+      sellers,
+    } = req.body;
 
     // ======================
     // PAYLOAD
@@ -606,33 +620,42 @@ export const updateApplication = async (
       nib,
       officer_id: officerId,
 
-      // SINGLE FILES
-      cert_file: files.cert_file?.[0],
-      akta_jual_beli: files.akta_jual_beli?.[0],
-      fc_sppt: files.fc_sppt?.[0],
-      fc_pbb: files.fc_pbb?.[0],
-      ssb: files.ssb?.[0],
+      // SINGLE FILE
+      akta_jual_beli: files?.akta_jual_beli?.[0],
+      sppt_pbb: files?.sppt_pbb?.[0],
+      bphtb: files?.bphtb?.[0],
+      pph: files?.pph?.[0],
 
-      // MULTIPLE FILES
-      ktp_penjual: (files.ktp_penjual ?? []).map((file, index) => ({
-        file,
-        person_id: ktpPenjualPersonIds[index],
-      })),
+      // MULTIPLE FILE
+      ...(files?.ktp_penjual && {
+        ktp_penjual: files.ktp_penjual.map((file, index) => ({
+          file,
+          person_id: ktpPenjualPersonIds[index],
+        })),
+      }),
 
-      ktp_pembeli: (files.ktp_pembeli ?? []).map((file, index) => ({
-        file,
-        person_id: ktpPembeliPersonIds[index],
-      })),
+      ...(files?.ktp_pembeli && {
+        ktp_pembeli: files.ktp_pembeli.map((file, index) => ({
+          file,
+          person_id: ktpPembeliPersonIds[index],
+        })),
+      }),
 
-      kk_pembeli: (files.kk_pembeli ?? []).map((file, index) => ({
-        file,
-        person_id: kkPembeliPersonIds[index],
-      })),
+      ...(files?.kk_pembeli && {
+        kk_pembeli: files.kk_pembeli.map((file, index) => ({
+          file,
+          person_id: kkPembeliPersonIds[index],
+        })),
+      }),
 
-      owners,
+      ...(owners && {
+        owners,
+      }),
+
+      ...(sellers && {
+        sellers: JSON.parse(sellers),
+      }),
     };
-
-    // console.log("payload :", payload);
 
     // ======================
     // SERVICE
@@ -643,10 +666,6 @@ export const updateApplication = async (
       payload,
       tempFolder,
     );
-
-    // ======================
-    // RESPONSE
-    // ======================
 
     res.status(200).json({
       status: "success",
