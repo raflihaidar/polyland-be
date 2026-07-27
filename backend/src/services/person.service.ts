@@ -138,6 +138,7 @@ export const findDetailUser = async (id: string) => {
         nip: true,
         landOffice: true,
         headOfLandOffice: false,
+        wallet_address: true,
         roles: {
           select: {
             id: true,

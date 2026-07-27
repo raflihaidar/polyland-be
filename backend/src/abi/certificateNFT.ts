@@ -6,6 +6,11 @@ export const CertificateABI = [
         name: "admin",
         type: "address",
       },
+      {
+        internalType: "address",
+        name: "trustedForwarder",
+        type: "address",
+      },
     ],
     stateMutability: "nonpayable",
     type: "constructor",
@@ -199,6 +204,12 @@ export const CertificateABI = [
         name: "cid",
         type: "string",
       },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "executedBy",
+        type: "address",
+      },
     ],
     name: "CertificateCIDSet",
     type: "event",
@@ -218,6 +229,12 @@ export const CertificateABI = [
         name: "recipient",
         type: "address",
       },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "executedBy",
+        type: "address",
+      },
     ],
     name: "CertificateMinted",
     type: "event",
@@ -230,6 +247,12 @@ export const CertificateABI = [
         internalType: "uint256",
         name: "tokenId",
         type: "uint256",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "executedBy",
+        type: "address",
       },
     ],
     name: "CertificateRevoked",
@@ -247,13 +270,13 @@ export const CertificateABI = [
       {
         indexed: true,
         internalType: "address",
-        name: "from",
+        name: "to",
         type: "address",
       },
       {
         indexed: true,
         internalType: "address",
-        name: "to",
+        name: "executedBy",
         type: "address",
       },
     ],
@@ -409,6 +432,19 @@ export const CertificateABI = [
     inputs: [
       {
         internalType: "address",
+        name: "officerAddress",
+        type: "address",
+      },
+    ],
+    name: "addOfficer",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
         name: "to",
         type: "address",
       },
@@ -482,6 +518,11 @@ export const CertificateABI = [
             internalType: "uint256",
             name: "timestamp",
             type: "uint256",
+          },
+          {
+            internalType: "address",
+            name: "executedBy",
+            type: "address",
           },
         ],
         internalType: "struct CertificateNFT.OwnershipRecord[]",
@@ -580,6 +621,25 @@ export const CertificateABI = [
   {
     inputs: [
       {
+        internalType: "address",
+        name: "forwarder",
+        type: "address",
+      },
+    ],
+    name: "isTrustedForwarder",
+    outputs: [
+      {
+        internalType: "bool",
+        name: "",
+        type: "bool",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
         internalType: "uint256",
         name: "tokenId",
         type: "uint256",
@@ -650,6 +710,19 @@ export const CertificateABI = [
   {
     inputs: [
       {
+        internalType: "address",
+        name: "officerAddress",
+        type: "address",
+      },
+    ],
+    name: "removeOfficer",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
         internalType: "bytes32",
         name: "role",
         type: "bytes32",
@@ -700,7 +773,7 @@ export const CertificateABI = [
     inputs: [
       {
         internalType: "uint256",
-        name: "tokenId",
+        name: "",
         type: "uint256",
       },
     ],
@@ -897,6 +970,19 @@ export const CertificateABI = [
     name: "transferOwnershipByBPN",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "trustedForwarder",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
 ] as const;

@@ -15,8 +15,8 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/wallet/nonce", requestWalletNonceHandler);
 router.post("/wallet/verify", loginWalletVerifyHandler);
+router.post("/logout", authentication, logout);
 router.get("/refresh", refresh);
-router.get("/logout", logout);
 router.get("/me", authentication, user);
 
 export default router;

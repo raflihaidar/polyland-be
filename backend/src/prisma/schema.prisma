@@ -53,14 +53,19 @@ enum Gender {
 }
 
 enum DocumentType {
-  KTP_PEMBELI
-  KTP_PENJUAL
-  KK_PEMBELI
+  KTP
+  KARTU_KELUARGA
+  NPWP
+  SURAT_NIKAH
+  SPPT_PBB
+  PPH
+  BPHTB
   AKTA_JUAL_BELI
-  PBB
-  SPPT
-  SSB
-  SERTIFIKAT_TANAH
+}
+
+enum ApplicantRole {
+  BUYER
+  SELLER
 }
 
 enum CertificateType {
@@ -127,13 +132,14 @@ model Person {
   publicKey  String? @db.Text
   privateKey String? @db.Text
 
-  nonce String? @db.VarChar(100)
+  nonce            String?   @db.VarChar(100)
+  nonce_expires_at DateTime?
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  accountVerifications AccountVerification[]
+  accountVerifications AccountVerification?
   verifiedAccounts     AccountVerification[] @relation("VerificationApprover")
   officerApplications  Application[]         @relation("ApplicationOfficer")
   applications         Application[]
@@ -144,6 +150,7 @@ model Person {
   headOfLandOffice     LandOffice?           @relation("HeadOffice")
   documentIdentity     ApplicationDocument[]
   queues               Queue[]
+  applicationSellers   ApplicationSeller[]
 
   @@map("persons")
 }
@@ -369,6 +376,7 @@ model Application {
   certificate Certificate?          @relation(fields: [cert_code], references: [code])
   document    ApplicationDocument[]
   owners      ApplicationOwner[]
+  sellers     ApplicationSeller[]
   payments    ApplicationPayment[]
 
   @@map("applications")
@@ -393,9 +401,10 @@ model ApplicationPayment {
 }
 
 model ApplicationDocument {
-  id             String  @id @default(uuid()) @db.Uuid
-  application_id String  @db.Uuid
-  person_id      String? @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
+  application_id String         @db.Uuid
+  person_id      String?        @db.Uuid
+  role           ApplicantRole?
 
   type DocumentType
 
@@ -427,6 +436,19 @@ model ApplicationOwner {
 
   @@unique([application_id, person_id])
   @@map("application_owners")
+}
+
+model ApplicationSeller {
+  id String @id @default(uuid()) @db.Uuid
+
+  application_id String @db.Uuid
+  person_id      String @db.Uuid
+
+  application Application @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  person      Person      @relation(fields: [person_id], references: [id])
+
+  @@unique([application_id, person_id])
+  @@map("application_sellers")
 }
 
 model Queue {
@@ -537,7 +559,7 @@ model RolePerson {
 model AccountVerification {
   id String @id @default(uuid()) @db.Uuid
 
-  person_id String @db.Uuid
+  person_id String @unique @db.Uuid
   person    Person @relation(fields: [person_id], references: [id])
 
   fullName   String   @db.VarChar(150)

@@ -47,19 +47,10 @@ export const login = async (
       throw new AppError("Email dan password tidak boleh kosong", 400);
     }
 
-    const { accessToken, refreshToken, person } =
-      await AuthService.login(email);
-
-    if (!person) {
-      throw new AppError("User tidak ditemukan", 404);
-    }
-
-    // Cek password
-    const isMatch = await bcrypt.compare(password, person.password);
-
-    if (!isMatch) {
-      throw new AppError("Email atau password salah", 400);
-    }
+    const { accessToken, refreshToken } = await AuthService.login(
+      email,
+      password,
+    );
 
     res
       .status(200)
@@ -89,8 +80,8 @@ export const requestWalletNonceHandler = async (
     const result = await AuthService.requestWalletNonce(walletAddress);
     res.status(200).json({
       status: "success",
-      message: "Nonce wallet berhasil dibuat",
-      data: result,
+      message: result.message || "Nonce berhasil dibuat",
+      nonce: result,
     });
   } catch (error: unknown) {
     next(error);
@@ -120,7 +111,11 @@ export const loginWalletVerifyHandler = async (
         sameSite: "lax",
         secure: false,
       })
-      .json({ status: "success", message: "Login degan wallet sukses" });
+      .json({
+        status: "success",
+        message: "Login degan wallet sukses",
+        valid: true,
+      });
   } catch (error: unknown) {
     next(error);
   }
@@ -163,20 +158,17 @@ export const user = async (req: Request, res: Response) => {
   });
 };
 
-export const logout = async (req: Request, res: Response) => {
-  res.clearCookie("refresh_token", {
-    httpOnly: true,
-    sameSite: "none",
-    secure: true,
-    path: "/",
-  });
+export const logout = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const personId = req.person.id;
 
-  res.clearCookie("access_token", {
-    httpOnly: true,
-    sameSite: "none",
-    secure: true,
-    path: "/",
-  });
-
-  res.status(200).json({ status: "success", message: "Logout berhasil" });
+    await AuthService.logout(personId);
+    res.status(200).json({ status: "success", message: "Logout berhasil" });
+  } catch (error) {
+    next(error);
+  }
 };
