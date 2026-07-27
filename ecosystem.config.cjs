@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "api",
       cwd: __dirname,
-      script: "./backend/src/a.js",
+      script: "./dist/backend/src/app.js",
       instances: 1,
       exec_mode: "fork",
       env: { NODE_ENV: "production" },
