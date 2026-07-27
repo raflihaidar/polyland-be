@@ -33,7 +33,7 @@
     "puppeteer": "^24.43.1",
     "tsx": "^4.21.0",
     "typescript": "~5.8.0",
-    "viem": "^2.45.1",
+    "viem": "^2.55.10",
     "vitest": "^4.1.6"
   },
   "dependencies": {
