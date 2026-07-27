@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: app
+    container_name: jejaktanah-be
     restart: unless-stopped
     ports:
       - "${APP_PORT}:${APP_PORT}"
