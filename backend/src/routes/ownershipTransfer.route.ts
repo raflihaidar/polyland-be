@@ -14,6 +14,7 @@ import {
   updateApplication,
   enqueueCertificateGeneration,
   cancelPayment,
+  requestMintSignature,
 } from "../controllers/ownershipTransfer.controller.js";
 import { authentication } from "../middlewares/authentication.js";
 import { authorize } from "../middlewares/authorization.js";
@@ -62,16 +63,23 @@ router.post(
   "/submit",
   authorize("peralihan-hak", "create"),
   upload.fields([
-    { name: "cert_file", maxCount: 1 },
+    // ─── Dokumen tunggal (level-aplikasi) ───────────────────────────
     { name: "akta_jual_beli", maxCount: 1 },
-    { name: "fc_sppt", maxCount: 1 },
-    { name: "fc_pbb", maxCount: 1 },
-    { name: "ssb", maxCount: 1 },
+    { name: "sppt_pbb", maxCount: 1 },
+    { name: "bphtb", maxCount: 1 },
+    { name: "pph", maxCount: 1 },
 
-    // array files
+    // ─── Dokumen Pembeli (array, per-orang) ─────────────────────────
     { name: "ktp_pembeli", maxCount: 10 },
-    { name: "ktp_penjual", maxCount: 10 },
     { name: "kk_pembeli", maxCount: 10 },
+    { name: "npwp_pembeli", maxCount: 10 },
+    { name: "surat_nikah_pembeli", maxCount: 10 },
+
+    // ─── Dokumen Penjual (array, per-orang) ─────────────────────────
+    { name: "ktp_penjual", maxCount: 10 },
+    { name: "kk_penjual", maxCount: 10 },
+    { name: "npwp_penjual", maxCount: 10 },
+    { name: "surat_nikah_penjual", maxCount: 10 },
   ]),
   submitApplication,
 );
@@ -81,6 +89,11 @@ router.post(
   cancelPayment,
 );
 router.post("/enqueue-certificate/:id", enqueueCertificateGeneration);
+router.post(
+  "/request-mint-signature",
+  authorize("peralihan-hak", "update"),
+  requestMintSignature,
+);
 router.put(
   "/status",
   authorize("peralihan-hak", "update"),
@@ -91,16 +104,23 @@ router.put(
   authorize("peralihan-hak", "update"),
   (req, res, next) => {
     const upload = uploadUpdate(req.params.id as string).fields([
-      { name: "cert_file", maxCount: 1 },
+      // ─── Dokumen tunggal (level-aplikasi) ───────────────────────────
       { name: "akta_jual_beli", maxCount: 1 },
-      { name: "fc_sppt", maxCount: 1 },
-      { name: "fc_pbb", maxCount: 1 },
-      { name: "ssb", maxCount: 1 },
+      { name: "sppt_pbb", maxCount: 1 },
+      { name: "bphtb", maxCount: 1 },
+      { name: "pph", maxCount: 1 },
 
-      // array files
+      // ─── Dokumen Pembeli (array, per-orang) ─────────────────────────
       { name: "ktp_pembeli", maxCount: 10 },
-      { name: "ktp_penjual", maxCount: 10 },
       { name: "kk_pembeli", maxCount: 10 },
+      { name: "npwp_pembeli", maxCount: 10 },
+      { name: "surat_nikah_pembeli", maxCount: 10 },
+
+      // ─── Dokumen Penjual (array, per-orang) ─────────────────────────
+      { name: "ktp_penjual", maxCount: 10 },
+      { name: "kk_penjual", maxCount: 10 },
+      { name: "npwp_penjual", maxCount: 10 },
+      { name: "surat_nikah_penjual", maxCount: 10 },
     ]);
 
     upload(req, res, function (err) {

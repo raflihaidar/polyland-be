@@ -3,8 +3,9 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 
-contract CertificateNFT is ERC721, AccessControl {
+contract CertificateNFT is ERC721, AccessControl, ERC2771Context {
 
     uint256 private _tokenIdCounter = 1;
 
@@ -15,6 +16,7 @@ contract CertificateNFT is ERC721, AccessControl {
     struct OwnershipRecord {
         address owner;
         uint256 timestamp;
+        address executedBy;
     }
 
     mapping(uint256 => string) public _certificateCID;
@@ -23,32 +25,48 @@ contract CertificateNFT is ERC721, AccessControl {
 
     event CertificateMinted(
         uint256 indexed tokenId,
-        address indexed recipient
+        address indexed recipient,
+        address indexed executedBy
     );
 
     event CertificateCIDSet(
         uint256 indexed tokenId,
-        string cid
+        string cid,
+        address indexed executedBy
     );
 
     event OwnershipTransferredByBPN(
         uint256 indexed tokenId,
-        address indexed from,
-        address indexed to
+        address indexed to,
+        address indexed executedBy
     );
 
-    event CertificateRevoked(uint256 indexed tokenId);
+    event CertificateRevoked(uint256 indexed tokenId, address indexed executedBy);
 
-    constructor(address admin)
-        ERC721("PolyLand NFT", "PLYNFT")
+    // Constructor menerima address Trusted Forwarder (Trusted Relayer / Paymaster)
+    constructor(address admin, address trustedForwarder)
+        ERC721("JejakTanah NFT", "JTNFT")
+        ERC2771Context(trustedForwarder) // Registrasi trusted forwarder
     {
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(BPN_ROLE, admin);
     }
 
-    function mintCertificate(
-        address recipient
-    )
+    function addOfficer(address officerAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        // Validasi 1: Pastikan address bukan address nol / kosong
+        require(officerAddress != address(0), "Invalid officer address");
+
+        // Validasi 2: Pastikan petugas belum memiliki BPN_ROLE agar tidak boros gas fee
+        require(!hasRole(BPN_ROLE, officerAddress), "Officer already has BPN_ROLE");
+
+        grantRole(BPN_ROLE, officerAddress);
+    }
+
+    function removeOfficer(address officerAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        revokeRole(BPN_ROLE, officerAddress);
+    }
+
+    function mintCertificate(address recipient)
         external
         onlyRole(BPN_ROLE)
         returns (uint256)
@@ -57,19 +75,17 @@ contract CertificateNFT is ERC721, AccessControl {
 
         _safeMint(recipient, tokenId);
 
+        // Gunakan _msgSender() untuk mencatat petugas asli
         _ownershipHistory[tokenId].push(
-            OwnershipRecord(recipient, block.timestamp)
+            OwnershipRecord(recipient, block.timestamp, _msgSender())
         );
 
-        emit CertificateMinted(tokenId, recipient);
+        emit CertificateMinted(tokenId, recipient, _msgSender());
 
         return tokenId;
     }
 
-    function setCertificateCID(
-        uint256 tokenId,
-        string memory cid
-    )
+    function setCertificateCID(uint256 tokenId, string memory cid)
         external
         onlyRole(BPN_ROLE)
     {
@@ -79,7 +95,7 @@ contract CertificateNFT is ERC721, AccessControl {
 
         _certificateCID[tokenId] = cid;
 
-        emit CertificateCIDSet(tokenId, cid);
+        emit CertificateCIDSet(tokenId, cid, _msgSender());
     }
 
     function transferOwnershipByBPN(
@@ -95,30 +111,37 @@ contract CertificateNFT is ERC721, AccessControl {
         address currentOwner = ownerOf(tokenId);
 
         _bpnTransferInProgress = true;
-
         _transfer(currentOwner, newOwner, tokenId);
-
         _bpnTransferInProgress = false;
 
         _certificateCID[tokenId] = newCid;
 
         _ownershipHistory[tokenId].push(
-            OwnershipRecord(newOwner, block.timestamp)
+            OwnershipRecord(newOwner, block.timestamp, _msgSender())
         );
 
         emit OwnershipTransferredByBPN(
             tokenId,
-            currentOwner,
-            newOwner
+            newOwner,
+            _msgSender()
         );
     }
 
-    function revoke(uint256 tokenId)
-        external
-        onlyRole(BPN_ROLE)
-    {
+    function revoke(uint256 tokenId) external onlyRole(BPN_ROLE) {
+        require(!revoked[tokenId], "Already revoked");
         revoked[tokenId] = true;
-        emit CertificateRevoked(tokenId);
+        emit CertificateRevoked(tokenId, _msgSender());
+    }
+
+    // Standard ERC-721 Metadata Resolver
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override
+        returns (string memory)
+    {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        return string(abi.encodePacked("ipfs://", _certificateCID[tokenId]));
     }
 
     function _update(
@@ -131,6 +154,10 @@ contract CertificateNFT is ERC721, AccessControl {
         returns (address)
     {
         address from = _ownerOf(tokenId);
+
+        if (revoked[tokenId]) {
+            revert("Cannot transfer revoked certificate");
+        }
 
         if (
             from != address(0) &&
@@ -151,14 +178,36 @@ contract CertificateNFT is ERC721, AccessControl {
         return _ownershipHistory[tokenId];
     }
 
-    function isVerified(uint256 tokenId)
-        public
+    function isVerified(uint256 tokenId) public view returns (bool) {
+        return _ownerOf(tokenId) != address(0) && !revoked[tokenId];
+    }
+
+    // --- OVERRIDE WAJIB UNTUK ERC2771Context & AccessControl ---
+    function _msgSender()
+        internal
         view
-        returns (bool)
+        override(Context, ERC2771Context)
+        returns (address)
     {
-        return
-            _ownerOf(tokenId) != address(0) &&
-            !revoked[tokenId];
+        return ERC2771Context._msgSender();
+    }
+
+    function _msgData()
+        internal
+        view
+        override(Context, ERC2771Context)
+        returns (bytes calldata)
+    {
+        return ERC2771Context._msgData();
+    }
+
+    function _contextSuffixLength()
+        internal
+        view
+        override(Context, ERC2771Context)
+        returns (uint256)
+    {
+        return ERC2771Context._contextSuffixLength();
     }
 
     function supportsInterface(bytes4 interfaceId)

@@ -88,9 +88,24 @@ export const submit = async (data: VerificationAccountCreate) => {
   try {
     const isExisting = await isVerified(data.person_id);
 
+    if (isExisting === "REJECTED") {
+      const verificationAccount = await prisma.accountVerification.update({
+        where: {
+          person_id: data.person_id,
+        },
+        data: {
+          ...data,
+          birthDate: new Date(data.birthDate),
+          status: VerificationStatus.PENDING,
+        },
+      });
+
+      return verificationAccount;
+    }
+
     if (isExisting === "PENDING")
       throw new AppError("Akun anda sedang dalam proses verifikasi", 403);
-    if (isExisting === "APPROVED")
+    else if (isExisting === "APPROVED")
       throw new AppError("Akun sudah terverifikasi", 403);
 
     const verificationAccount = await prisma.accountVerification.create({
@@ -106,7 +121,7 @@ export const submit = async (data: VerificationAccountCreate) => {
     if (err instanceof AppError) {
       throw err;
     }
-    throw new AppError("Gagal melakukan verifikasi akun", 500, err.meta);
+    throw new AppError("Gagal mengirim verifikasi akun", 500, err.meta);
   }
 };
 
@@ -209,7 +224,7 @@ export const verify = async (data: VerificationAccountUpdate) => {
         },
         data: {
           status: data.status,
-          rejectionReason: data.rejectionReason ?? null,
+          rejectionReason: null,
         },
       });
 
@@ -284,6 +299,8 @@ export const findAccountByPersonId = async (person_id: string) => {
         birthPlace: true,
         address: true,
         publicKey: true,
+        gender: true,
+        status: true,
         rejectionReason: true,
       },
     });

@@ -4,15 +4,11 @@ import { redisClient } from "../config/redis.js";
 import { generateTokens } from "../utils/jwt.js";
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
-import { verifyMessage, keccak256, toBytes } from "viem";
+import { verifyMessage } from "viem";
 import { REFRESH_TOKEN_SECRET, ACCESS_TOKEN_SECRET } from "../config/token.js";
 import jwt from "jsonwebtoken";
 import { AppError } from "../utils/error.js";
-import { publicClient, contractConfig } from "../config/wallet.js";
 import { Prisma } from "@prisma/client/extension";
-
-const CITIZEN_ROLE = keccak256(toBytes("CITIZEN_ROLE"));
-const BPN_ROLE = keccak256(toBytes("BPN_ROLE"));
 
 export const register = async (data: RegisterRequest) => {
   try {
@@ -57,7 +53,7 @@ export const register = async (data: RegisterRequest) => {
   }
 };
 
-export const login = async (email: string) => {
+export const login = async (email: string, password: string) => {
   try {
     const person = await prisma.person.findUnique({
       where: { email },
@@ -96,32 +92,21 @@ export const login = async (email: string) => {
         400,
       );
     }
+    // Cek password
+    const isMatch = await bcrypt.compare(password, person.password!);
 
-    // update nonce
-    await prisma.person.update({
-      where: { id: person.id },
-      data: { nonce: randomBytes(16).toString("hex") },
-    });
+    if (!isMatch) {
+      throw new AppError("Email atau password salah", 400);
+    }
 
-    /**
-     * ==============================
-     * FLATTEN PERMISSIONS
-     * ==============================
-     */
     const permissions = person.roles.flatMap((rp: any) =>
       rp.role.privileges.map(
         (p: any) => `${p.privilege.module.slug}:${p.privilege.action}`,
       ),
     );
 
-    // hapus duplicate permission
     const uniquePermissions: any = [...new Set(permissions)];
 
-    /**
-     * ==============================
-     * GENERATE JWT
-     * ==============================
-     */
     const jwtPayload = {
       id: person.id,
       roles: person.roles.map((rp: any) => rp.role.name),
@@ -129,34 +114,23 @@ export const login = async (email: string) => {
 
     const { accessToken, refreshToken } = generateTokens(jwtPayload);
 
-    /**
-     * ==============================
-     * SIMPAN KE REDIS
-     * ==============================
-     */
-
-    // 1️⃣ simpan refresh token
     await redisClient.set(`refresh:${person.id}`, refreshToken, {
       EX: 60 * 60 * 24 * 7, // 7 hari
     });
 
-    // 2️⃣ simpan permission sebagai Redis Set
     const permissionKey = `permission:${person.id}`;
 
     await redisClient.del(permissionKey);
 
-    // simpan permission sebagai Redis Set
     if (uniquePermissions.length > 0) {
       await redisClient.sAdd(permissionKey, uniquePermissions);
 
-      // expire optional (recommended)
-      await redisClient.expire(permissionKey, 60 * 60 * 24); // 1 hari
+      await redisClient.expire(permissionKey, 60 * 60 * 24);
     }
 
     return {
       accessToken,
       refreshToken,
-      person,
     };
   } catch (error: unknown) {
     if (error instanceof AppError) {
@@ -164,6 +138,26 @@ export const login = async (email: string) => {
     }
 
     throw new AppError("Login gagal", 500);
+  }
+};
+
+export const logout = async (personId: string) => {
+  try {
+    if (!personId) {
+      throw new AppError("Data user tidak ditemukan", 400);
+    }
+
+    await redisClient.del(`refresh:${personId}`);
+
+    await redisClient.del(`permission:${personId}`);
+
+    return true;
+  } catch (error: unknown) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError("Logout gagal", 500);
   }
 };
 
@@ -225,27 +219,43 @@ export const getUser = async (id: string) => {
 export const requestWalletNonce = async (wallet_address: string) => {
   try {
     const nonce = randomBytes(16).toString("hex");
+    const nonceExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     let person = await prisma.person.findUnique({
       where: { wallet_address },
     });
 
     if (!person) {
-      person = await prisma.person.create({
-        data: {
-          wallet_address,
-          nonce,
-        },
-      });
-    } else {
-      await prisma.person.update({
-        where: { id: person.id },
-        data: { nonce },
-      });
+      throw new AppError(
+        "Wallet belum terhubung dengan akun. Silakan login menggunakan akun terlebih dahulu.",
+        404,
+      );
     }
 
+    await prisma.person.update({
+      where: { id: person.id },
+      data: {
+        nonce,
+        nonce_expires_at: nonceExpiresAt,
+      },
+    });
+
+    const message = `Jejak Tanahku
+
+    Verifikasi Kepemilikan Wallet
+
+    Silakan tandatangani pesan ini untuk memverifikasi bahwa Anda adalah pemilik wallet ini.
+
+    Tanda tangan ini:
+    - Bukan transaksi blockchain.
+    - Tidak memerlukan biaya gas.
+    - Tidak memberikan akses ke aset Anda.
+
+    Nonce: ${nonce}`;
+
     return {
-      message: `Login to Polyland\nWallet: ${wallet_address}\nNonce: ${nonce}`,
+      message,
+      nonce,
     };
   } catch (error: unknown) {
     if (error instanceof AppError) {
@@ -269,10 +279,31 @@ export const loginWalletVerify = async (
     });
 
     if (!person) {
-      throw new AppError("Data tidak ditemukan", 404);
+      throw new AppError(
+        "Wallet belum terhubung dengan akun. Silakan login menggunakan akun terlebih dahulu.",
+        404,
+      );
     }
 
-    const message = `Login to Polyland\nWallet: ${wallet_address}\nNonce: ${person.nonce}`;
+    if (!person.nonce_expires_at || person.nonce_expires_at < new Date()) {
+      throw new AppError(
+        "Sesi verifikasi telah berakhir. Silakan coba lagi.",
+        401,
+      );
+    }
+
+    const message = `Jejak Tanahku
+
+    Verifikasi Kepemilikan Wallet
+
+    Silakan tandatangani pesan ini untuk memverifikasi bahwa Anda adalah pemilik wallet ini.
+
+    Tanda tangan ini:
+    - Bukan transaksi blockchain.
+    - Tidak memerlukan biaya gas.
+    - Tidak memberikan akses ke aset Anda.
+
+    Nonce: ${person.nonce}`;
 
     const isValid = verifyMessage({
       address: wallet_address,
@@ -284,73 +315,81 @@ export const loginWalletVerify = async (
       throw new AppError("Signature tidak valid, silahkan coba lagi", 403);
     }
 
-    // Ambil semua role yang dibutuhkan sekaligus
-    const [bpnRole, citizenRole, guestRole] = await Promise.all([
-      prisma.role.findFirst({ where: { name: "admin kantah" } }),
-      prisma.role.findFirst({ where: { name: "citizen" } }),
-      prisma.role.findFirst({ where: { name: "guest" } }),
-    ]);
+    // // Ambil semua role yang dibutuhkan sekaligus
+    // const [bpnRole, citizenRole, guestRole] = await Promise.all([
+    //   prisma.role.findFirst({ where: { name: "admin kantah" } }),
+    //   prisma.role.findFirst({ where: { name: "citizen" } }),
+    //   prisma.role.findFirst({ where: { name: "guest" } }),
+    // ]);
 
-    if (!bpnRole || !citizenRole || !guestRole) {
-      throw new AppError("Konfigurasi role tidak lengkap", 500);
-    }
+    // if (!bpnRole || !citizenRole || !guestRole) {
+    //   throw new AppError("Konfigurasi role tidak lengkap", 500);
+    // }
 
-    let roleName: string = "guest";
+    // let roleName: string = "guest";
 
-    const isBPN = await publicClient.readContract({
-      ...contractConfig,
-      functionName: "hasRole",
-      args: [BPN_ROLE, wallet_address],
-    } as any);
+    // const isBPN = await publicClient.readContract({
+    //   ...contractConfig,
+    //   functionName: "hasRole",
+    //   args: [BPN_ROLE, wallet_address],
+    // } as any);
 
-    if (isBPN) {
-      roleName = bpnRole.name;
+    // if (isBPN) {
+    //   roleName = bpnRole.name;
 
-      await prisma.rolePerson.upsert({
-        where: {
-          person_id_role_id: {
-            person_id: person.id,
-            role_id: bpnRole.id,
-          },
-        },
-        update: {},
-        create: {
-          person_id: person.id,
-          role_id: bpnRole.id,
-        },
-      });
-    } else {
-      const assignedRole = person.nik ? citizenRole : guestRole;
-      const removedRole = bpnRole; // hapus role BPN kalau ada
-      roleName = assignedRole.name;
+    //   await prisma.rolePerson.upsert({
+    //     where: {
+    //       person_id_role_id: {
+    //         person_id: person.id,
+    //         role_id: bpnRole.id,
+    //       },
+    //     },
+    //     update: {},
+    //     create: {
+    //       person_id: person.id,
+    //       role_id: bpnRole.id,
+    //     },
+    //   });
+    // } else {
+    //   const assignedRole = person.nik ? citizenRole : guestRole;
+    //   const removedRole = bpnRole; // hapus role BPN kalau ada
+    //   roleName = assignedRole.name;
 
-      await prisma.$transaction([
-        prisma.rolePerson.upsert({
-          where: {
-            person_id_role_id: {
-              person_id: person.id,
-              role_id: assignedRole.id,
-            },
-          },
-          update: {},
-          create: {
-            person_id: person.id,
-            role_id: assignedRole.id,
-          },
-        }),
+    //   await prisma.$transaction([
+    //     prisma.rolePerson.upsert({
+    //       where: {
+    //         person_id_role_id: {
+    //           person_id: person.id,
+    //           role_id: assignedRole.id,
+    //         },
+    //       },
+    //       update: {},
+    //       create: {
+    //         person_id: person.id,
+    //         role_id: assignedRole.id,
+    //       },
+    //     }),
 
-        prisma.rolePerson.deleteMany({
-          where: {
-            person_id: person.id,
-            role_id: removedRole.id,
-          },
-        }),
-      ]);
-    }
+    //     prisma.rolePerson.deleteMany({
+    //       where: {
+    //         person_id: person.id,
+    //         role_id: removedRole.id,
+    //       },
+    //     }),
+    //   ]);
+    // }
+
+    await prisma.person.update({
+      where: { id: person.id },
+      data: {
+        nonce: null,
+        nonce_expires_at: null,
+      },
+    });
 
     const jwtPayload = {
       id: person.id,
-      roles: [roleName],
+      roles: person.roles.map((rp: any) => rp.role.name),
     };
 
     const { accessToken, refreshToken } = generateTokens(jwtPayload);

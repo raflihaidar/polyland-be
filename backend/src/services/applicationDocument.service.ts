@@ -1,51 +1,80 @@
 import path from "path";
-import { DocumentType } from "../generated/prisma/enums.js";
+import { DocumentType, ApplicantRole } from "../generated/prisma/enums.js";
 
 export const mapApplicationDocuments = (applicationId: string, data: any) => {
   const docs: any[] = [];
 
   const baseFolder = `applications/${applicationId}`;
 
+  const buildFileFields = (file: any) => ({
+    fileUrl: `${baseFolder}/${path.basename(file.path)}`,
+    fileName: file.originalname,
+    mimeType: file.mimetype,
+    fileSize: file.size,
+  });
+
   const pushSingle = (file: any, type: DocumentType) => {
     if (!file) return;
 
     docs.push({
       application_id: applicationId,
+      person_id: null,
       type,
-      fileUrl: `${baseFolder}/${path.basename(file.path)}`,
-      fileName: file.originalname,
-      mimeType: file.mimetype,
-      fileSize: file.size,
+      ...buildFileFields(file),
     });
   };
 
-  const pushArrayWithPerson = (items: any[], type: DocumentType) => {
+  const pushArrayWithPerson = (
+    items: any[],
+    type: DocumentType,
+    role: ApplicantRole,
+  ) => {
     if (!items?.length) return;
 
-    items.forEach((item) => {
+    items.forEach((item, index) => {
       if (!item.file) return;
+      if (!item.person_id) {
+        throw new Error(
+          `person_id kosong untuk dokumen ${type} pada index ${index}. ` +
+            `Pastikan Person sudah di-upsert sebelum memanggil mapApplicationDocuments.`,
+        );
+      }
 
       docs.push({
         application_id: applicationId,
         person_id: item.person_id,
+        role,
         type,
-        fileUrl: `${baseFolder}/${path.basename(item.file.path)}`,
-        fileName: item.file.originalname,
-        mimeType: item.file.mimetype,
-        fileSize: item.file.size,
+        ...buildFileFields(item.file),
       });
     });
   };
 
-  pushSingle(data.cert_file, DocumentType.SERTIFIKAT_TANAH);
+  // ─── Dokumen level-aplikasi (satu file, tidak terkait person) ───────
   pushSingle(data.akta_jual_beli, DocumentType.AKTA_JUAL_BELI);
-  pushSingle(data.fc_sppt, DocumentType.SPPT);
-  pushSingle(data.fc_pbb, DocumentType.PBB);
-  pushSingle(data.ssb, DocumentType.SSB);
+  pushSingle(data.bphtb, DocumentType.BPHTB);
+  pushSingle(data.pph, DocumentType.PPH);
+  pushSingle(data.sppt_pbb, DocumentType.SPPT_PBB);
 
-  pushArrayWithPerson(data.ktp_pembeli, DocumentType.KTP_PEMBELI);
-  pushArrayWithPerson(data.ktp_penjual, DocumentType.KTP_PENJUAL);
-  pushArrayWithPerson(data.kk_pembeli, DocumentType.KK_PEMBELI);
+  // ─── Dokumen Pembeli ────────────────────────────────────────────────
+  pushArrayWithPerson(data.ktp_pembeli, DocumentType.KTP, "BUYER");
+  pushArrayWithPerson(data.kk_pembeli, DocumentType.KARTU_KELUARGA, "BUYER");
+  pushArrayWithPerson(data.npwp_pembeli, DocumentType.NPWP, "BUYER");
+  pushArrayWithPerson(
+    data.surat_nikah_pembeli,
+    DocumentType.SURAT_NIKAH,
+    "BUYER",
+  );
+
+  // ─── Dokumen Penjual ────────────────────────────────────────────────
+  pushArrayWithPerson(data.ktp_penjual, DocumentType.KTP, "SELLER");
+  pushArrayWithPerson(data.kk_penjual, DocumentType.KARTU_KELUARGA, "SELLER");
+  pushArrayWithPerson(data.npwp_penjual, DocumentType.NPWP, "SELLER");
+  pushArrayWithPerson(
+    data.surat_nikah_penjual,
+    DocumentType.SURAT_NIKAH,
+    "SELLER",
+  );
 
   return docs;
 };
