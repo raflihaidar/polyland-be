@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: jejaktanah-be
+    container_name: jejaktanahku-be
     restart: unless-stopped
     ports:
       - "${APP_PORT}:${APP_PORT}"
@@ -20,7 +20,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - jejak-tanah-network
+      - jejaktanahku-network
 
   postgres:
     image: postgres:16
@@ -40,7 +40,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - jejak-tanah-network
+      - jejaktanahku-network
 
   redis:
     image: redis:7.0.15-alpine
@@ -56,12 +56,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - jejak-tanah-network
+      - jejaktanahku-network
 
 volumes:
   postgres-data:
   redis-data:
 
 networks:
-  jejak-tanah-network:
-     external: true
+  jejaktanahku-network:
+    external: true
