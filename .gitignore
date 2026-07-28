@@ -7,6 +7,8 @@
 # file upload output
 /backend/src/uploads
 
+/seed-output
+
 # pnpm deploy output
 /bundle
 

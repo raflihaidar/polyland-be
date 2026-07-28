@@ -1,8 +1,39 @@
 import { prisma } from "../config/prisma.js";
-import { AppError } from "../utils/error.js";
-import { publicClient } from "../config/wallet.js";
-import { contractConfig } from "../config/wallet.js";
+import handlebars from "handlebars";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import QRCode from "qrcode";
 import CryptoJS from "crypto-js";
+import { AppError } from "../utils/error.js";
+import puppeteer from "puppeteer";
+import {
+  toCapitalize,
+  formatDateIndonesia,
+  imageToBase64,
+} from "../utils/parse.js";
+import { encrypt } from "eciesjs";
+import { uploadFile } from "./pinata.service.js";
+import {
+  walletClient,
+  publicClient,
+  contractConfig,
+} from "../config/wallet.js";
+import { CertificateStatus } from "../generated/prisma/enums.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+interface BuildCertificatePDFForTestingParams {
+  code: string;
+  nib: string;
+  type: string;
+  land: any;
+  owners: any[];
+  notes?: string[];
+  headOfficeName?: string;
+  headOfficeNip?: string;
+}
 
 export const searchCertificate = async (search: string) => {
   try {
@@ -16,6 +47,9 @@ export const searchCertificate = async (search: string) => {
             code: search,
           },
         ],
+        AND: {
+          status: CertificateStatus.AKTIF,
+        },
       },
       select: {
         id: true,
@@ -83,17 +117,20 @@ export const generateUniqueCode = (length = 6): string => {
 export const generateNIB = async (
   provinceCode: number,
   regencyCode: number,
-  indeksLetak: number,
+  districtCode: number,
+  villageCode: number,
 ) => {
-  if (indeksLetak < 0 || indeksLetak > 9) {
-    throw new Error("Indeks letak harus antara 0 - 9");
-  }
+  const provStr = provinceCode.toString().padStart(2, "0");
+  const regStr = (regencyCode % 100).toString().padStart(2, "0");
+  const distStr = (districtCode % 100).toString().padStart(2, "0");
+  const villStr = (villageCode % 100).toString().padStart(2, "0");
+
+  const prefixNIB = `${provStr}.${regStr}.${distStr}.${villStr}`;
 
   const lastCertificate = await prisma.certificate.findFirst({
     where: {
-      land: {
-        province_code: provinceCode,
-        regency_code: regencyCode,
+      nib: {
+        startsWith: prefixNIB,
       },
     },
     orderBy: {
@@ -107,31 +144,24 @@ export const generateNIB = async (
   let nextSequence = 1;
 
   if (lastCertificate?.nib) {
-    const lastSequence = lastCertificate.nib.slice(6, 15);
-    nextSequence = parseInt(lastSequence) + 1;
+    const parts = lastCertificate.nib.split(".");
+    if (parts.length === 5) {
+      const lastSequence = parseInt(parts[4], 10);
+      if (!isNaN(lastSequence)) {
+        nextSequence = lastSequence + 1;
+      }
+    }
   }
 
-  const sequenceFormatted = nextSequence.toString().padStart(9, "0");
+  const sequenceFormatted = nextSequence.toString().padStart(5, "0");
 
-  const formatedRegencyCode = regencyCode % 100;
-
-  const nib =
-    provinceCode.toString().padStart(2, "0") +
-    "." +
-    formatedRegencyCode.toString().padStart(2, "0") +
-    "." +
-    sequenceFormatted +
-    "." +
-    indeksLetak.toString();
-
-  return nib;
+  return `${prefixNIB}.${sequenceFormatted}`;
 };
 
 export const getCertificates = async (
   person_id: string,
   page: number = 1,
   limit: number = 10,
-  type?: string,
   status?: string,
   search?: string,
   sortOrder: "asc" | "desc" = "desc",
@@ -146,7 +176,6 @@ export const getCertificates = async (
           person_id,
         },
       },
-      ...(type && { type }),
       ...(status && { status }),
       ...(search && {
         OR: [
@@ -255,6 +284,7 @@ export const getCertificates = async (
       },
     };
   } catch (err: any) {
+    console.log(err);
     throw new AppError("Gagal mendapatkan sertifikat", 500, err.meta);
   }
 };
@@ -470,4 +500,116 @@ export const updateLabelCertificate = async (id: string, label: string) => {
   } catch (error: any) {
     throw new AppError("Update data sertifikat gagal", 500, error?.meta);
   }
+};
+
+export const generatePDF = async (html: string): Promise<Buffer> => {
+  const browser = await puppeteer.launch({
+    headless: true,
+  });
+
+  const page = await browser.newPage();
+
+  await page.setContent(html, {
+    waitUntil: "domcontentloaded",
+  });
+
+  // Tunggu network idle secara terpisah — hasilnya setara dengan
+  // waitUntil: "networkidle0" di setContent, tapi tipe-nya cocok.
+  await page.waitForNetworkIdle({ idleTime: 500 });
+
+  const pdfBuffer = await page.pdf({
+    format: "A4",
+    printBackground: true,
+    margin: {
+      top: "0px",
+      right: "0px",
+      bottom: "0px",
+      left: "0px",
+    },
+  });
+
+  await browser.close();
+
+  return Buffer.from(pdfBuffer);
+};
+
+export const buildCertificatePDFForTesting = async ({
+  code,
+  nib,
+  type,
+  land,
+  owners,
+  notes = [],
+  headOfficeName = "Kepala Kantor (Testing)",
+  headOfficeNip = "000000000000000000",
+}: BuildCertificatePDFForTestingParams): Promise<Buffer> => {
+  const templatePath = path.join(__dirname, "../templates/certificate.html");
+  const templateHtml = fs.readFileSync(templatePath, "utf-8");
+
+  const cssPath = path.join(__dirname, "../templates/certificate.css");
+  const css = fs.readFileSync(cssPath, "utf-8");
+
+  const htmlTemplate = templateHtml.replace(
+    "</head>",
+    `<style>${css}</style></head>`,
+  );
+
+  const garudaPath = path.join(__dirname, "../assets/lambang-pancasila.png");
+  const garudaImage = imageToBase64(garudaPath);
+
+  // Dummy QR — bukan tanda tangan asli headOffice.privateKey,
+  // cukup untuk kebutuhan render visual saat testing.
+  const qr_signature = await QRCode.toDataURL(
+    JSON.stringify({ code, nib, note: "TESTING - no real signature" }),
+  );
+  const qr_doc = await QRCode.toDataURL(
+    `${process.env.FE_URL}/verify/certificate/TEST-${code}`,
+  );
+
+  const template = handlebars.compile(htmlTemplate);
+
+  const certificateType: { label: string; value: string }[] = [
+    { label: "Hak Milik", value: "SHM" },
+    { label: "Hak Guna Usaha", value: "SHGU" },
+    { label: "Hak Guna Bangunan", value: "SHGB" },
+  ];
+  const selectedCertificateType = certificateType.find(
+    (item) => item.value === type,
+  );
+
+  const ownersData = owners.map((owner: any, index: number) => ({
+    no: index + 1,
+    id: owner.person.id,
+    name: owner.person.name,
+    birthPlace: owner.person.birthPlace,
+    birthDate: formatDateIndonesia(owner.person.birthDate),
+    share: owner.ownership_pct ?? owner.share,
+  }));
+
+  const noteList = notes.map((n: string, index: number) => ({
+    no: index + 1,
+    note: n,
+  }));
+
+  const html = template({
+    garuda_path: garudaImage,
+    code,
+    type: selectedCertificateType?.label ?? "-",
+    area_size: land.area_size,
+    owners: ownersData,
+    street_address: land.street_address,
+    ward: toCapitalize(land.village.name),
+    subdistrict: toCapitalize(land.district.name),
+    regency: toCapitalize(land.regency.name),
+    province: toCapitalize(land.province.name),
+    nama_kepala_kantor: headOfficeName,
+    nip: headOfficeNip,
+    nama_kabupaten: toCapitalize(land.regency.name),
+    nib,
+    notes: noteList,
+    qr_ttd: qr_signature,
+    qr_doc,
+  });
+
+  return generatePDF(html);
 };

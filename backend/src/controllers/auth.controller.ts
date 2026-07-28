@@ -158,17 +158,20 @@ export const user = async (req: Request, res: Response) => {
   });
 };
 
-export const logout = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    const personId = req.person.id;
+export const logout = async (req: Request, res: Response) => {
+  res.clearCookie("refresh_token", {
+    httpOnly: true,
+    sameSite: "none",
+    secure: true,
+    path: "/",
+  });
 
-    await AuthService.logout(personId);
-    res.status(200).json({ status: "success", message: "Logout berhasil" });
-  } catch (error) {
-    next(error);
-  }
+  res.clearCookie("access_token", {
+    httpOnly: true,
+    sameSite: "none",
+    secure: true,
+    path: "/",
+  });
+
+  res.status(200).json({ status: "success", message: "Logout berhasil" });
 };
