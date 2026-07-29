@@ -2,6 +2,7 @@ import * as AuthService from "../services/auth.service.js";
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../utils/error.js";
 import bcrypt from "bcrypt";
+import { COOKIE_OPTIONS } from "../config/token.js";
 
 export const register = async (
   req: Request,
@@ -52,18 +53,9 @@ export const login = async (
       password,
     );
 
+    res.cookie("access_token", accessToken, COOKIE_OPTIONS);
     res
-      .status(200)
-      .cookie("access_token", accessToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-      })
-      .cookie("refresh_token", refreshToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-      })
+      .cookie("refresh_token", refreshToken, COOKIE_OPTIONS)
       .json({ status: "success", message: "Login success" });
   } catch (error) {
     next(error);
@@ -99,23 +91,13 @@ export const loginWalletVerifyHandler = async (
       walletAddress,
       signature,
     );
-    res
-      .status(200)
-      .cookie("access_token", accessToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-      })
-      .cookie("refresh_token", refreshToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-      })
-      .json({
-        status: "success",
-        message: "Login degan wallet sukses",
-        valid: true,
-      });
+    res.status(200);
+    res.cookie("access_token", accessToken, COOKIE_OPTIONS);
+    res.cookie("refresh_token", refreshToken, COOKIE_OPTIONS).json({
+      status: "success",
+      message: "Login degan wallet sukses",
+      valid: true,
+    });
   } catch (error: unknown) {
     next(error);
   }
@@ -133,12 +115,7 @@ export const refresh = async (req: Request, res: Response) => {
 
     const { accessToken } = await AuthService.verifyRefreshToken(refreshToken);
 
-    res.cookie("access_token", accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      maxAge: 30 * 60 * 1000, // 30 menit
-    });
+    res.cookie("access_token", accessToken, COOKIE_OPTIONS);
 
     return res.json({
       message: "Access token refreshed",
@@ -159,19 +136,8 @@ export const user = async (req: Request, res: Response) => {
 };
 
 export const logout = async (req: Request, res: Response) => {
-  res.clearCookie("refresh_token", {
-    httpOnly: true,
-    sameSite: "none",
-    secure: true,
-    path: "/",
-  });
-
-  res.clearCookie("access_token", {
-    httpOnly: true,
-    sameSite: "none",
-    secure: true,
-    path: "/",
-  });
+  res.clearCookie("access_token", COOKIE_OPTIONS);
+  res.clearCookie("refresh_token", COOKIE_OPTIONS);
 
   res.status(200).json({ status: "success", message: "Logout berhasil" });
 };
