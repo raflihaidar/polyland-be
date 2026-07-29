@@ -497,6 +497,7 @@ export const updateApplicationStatus = async (
       VERIFIKASI_PEMBAYARAN:
         "Pembayaran telah diterima dan sedang diverifikasi",
       PROSES_PENERBITAN: "Dalam proses penerbitan sertifikat",
+      PENERBITAN_GAGAL: "Penerbitan Sertifikat Gagal",
       PEMBAYARAN_DIBATALKAN: "Pembayaran berhasil dibatalkan",
       PEMBAYARAN_KADALUARSA: "Pembayaran kedaluwarsa",
       PEMBAYARAN_DIKEMBALIKAN: "Pembayaran berhasil dikembalikan",
