@@ -761,21 +761,43 @@ export const requestMintSignature = async (
   next: NextFunction,
 ) => {
   try {
-    const { petugasAddress, recipientAddress } = req.body as {
+    const {
+      petugasAddress,
+      recipientAddress,
+      loketAddress,
+      nib,
+      luasTanah,
+      jenisHak,
+    } = req.body as {
       petugasAddress: Address;
       recipientAddress: Address;
+      loketAddress: Address;
+      nib: string;
+      luasTanah: bigint;
+      jenisHak: string;
     };
 
-    if (!petugasAddress || !recipientAddress) {
+    if (
+      !petugasAddress ||
+      !recipientAddress ||
+      !loketAddress ||
+      !nib ||
+      !luasTanah ||
+      !jenisHak
+    ) {
       return res.status(400).json({
         success: false,
-        message: "petugasAddress dan recipientAddress wajib diisi",
+        message: "terdapat data yang belum diisi, periksa kembali seluruh data",
       });
     }
 
     const typedData = await buildMintForwardRequest({
       petugasAddress,
       recipientAddress,
+      loketAddress,
+      nib,
+      luasTanah,
+      jenisHak,
     });
 
     res.json({

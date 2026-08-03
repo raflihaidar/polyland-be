@@ -19,14 +19,33 @@ contract CertificateNFT is ERC721, AccessControl, ERC2771Context {
         address executedBy;
     }
 
+    // Detail bidang tanah yang tercatat pada sertifikat
+    struct CertificateDetails {
+        address petugasPenerbit; // wallet address petugas BPN yang menerbitkan sertifikat
+        address petugasLoket;    // wallet address petugas loket yang menerima/mendaftarkan berkas
+        string nib;              // Nomor Induk Bidang
+        uint256 luasTanah;        // luas tanah dalam meter persegi (m2)
+        string tipeSertifikat;    // contoh: "SHM", "SHGB", "SHGU", "SHP"
+    }
+
     mapping(uint256 => string) public _certificateCID;
     mapping(uint256 => bool) public revoked;
     mapping(uint256 => OwnershipRecord[]) private _ownershipHistory;
+    mapping(uint256 => CertificateDetails) private _certificateDetails;
 
     event CertificateMinted(
         uint256 indexed tokenId,
         address indexed recipient,
         address indexed executedBy
+    );
+
+    event CertificateDetailsSet(
+        uint256 indexed tokenId,
+        address indexed petugasPenerbit,
+        address indexed petugasLoket,
+        string nib,
+        uint256 luasTanah,
+        string tipeSertifikat
     );
 
     event CertificateCIDSet(
@@ -53,10 +72,7 @@ contract CertificateNFT is ERC721, AccessControl, ERC2771Context {
     }
 
     function addOfficer(address officerAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        // Validasi 1: Pastikan address bukan address nol / kosong
         require(officerAddress != address(0), "Invalid officer address");
-
-        // Validasi 2: Pastikan petugas belum memiliki BPN_ROLE agar tidak boros gas fee
         require(!hasRole(BPN_ROLE, officerAddress), "Officer already has BPN_ROLE");
 
         grantRole(BPN_ROLE, officerAddress);
@@ -66,21 +82,43 @@ contract CertificateNFT is ERC721, AccessControl, ERC2771Context {
         revokeRole(BPN_ROLE, officerAddress);
     }
 
-    function mintCertificate(address recipient)
+    function mintCertificate(
+        address recipient,
+        address petugasLoket,
+        string memory nib,
+        uint256 luasTanah,
+        string memory tipeSertifikat
+    )
         external
         onlyRole(BPN_ROLE)
         returns (uint256)
     {
+        require(bytes(nib).length > 0, "NIB required");
+        require(luasTanah > 0, "Luas tanah must be > 0");
+        require(bytes(tipeSertifikat).length > 0, "Tipe sertifikat required");
+        require(petugasLoket != address(0), "Invalid petugas loket");
+
         uint256 tokenId = _tokenIdCounter++;
 
         _safeMint(recipient, tokenId);
 
-        // Gunakan _msgSender() untuk mencatat petugas asli
+        // Gunakan _msgSender() untuk mencatat petugas BPN (penerbit) yang menjalankan transaksi ini
+        address petugasPenerbit = _msgSender();
+
+        _certificateDetails[tokenId] = CertificateDetails({
+            petugasPenerbit: petugasPenerbit,
+            petugasLoket: petugasLoket,
+            nib: nib,
+            luasTanah: luasTanah,
+            tipeSertifikat: tipeSertifikat
+        });
+
         _ownershipHistory[tokenId].push(
-            OwnershipRecord(recipient, block.timestamp, _msgSender())
+            OwnershipRecord(recipient, block.timestamp, petugasPenerbit)
         );
 
-        emit CertificateMinted(tokenId, recipient, _msgSender());
+        emit CertificateMinted(tokenId, recipient, petugasPenerbit);
+        emit CertificateDetailsSet(tokenId, petugasPenerbit, petugasLoket, nib, luasTanah, tipeSertifikat);
 
         return tokenId;
     }
@@ -176,6 +214,15 @@ contract CertificateNFT is ERC721, AccessControl, ERC2771Context {
         returns (OwnershipRecord[] memory)
     {
         return _ownershipHistory[tokenId];
+    }
+
+    function getCertificateDetails(uint256 tokenId)
+        external
+        view
+        returns (CertificateDetails memory)
+    {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        return _certificateDetails[tokenId];
     }
 
     function isVerified(uint256 tokenId) public view returns (bool) {

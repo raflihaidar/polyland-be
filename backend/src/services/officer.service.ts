@@ -53,10 +53,10 @@ export const createHeadOfficer = async (payload: OfficerCreate) => {
     } = payload;
 
     const role = await prisma.role.findFirst({
-      where: { name: "kepala kantah" },
+      where: { name: "admin kantah" },
     });
 
-    if (!role) throw new AppError("Role kepala kantah tidak ditemukan", 404);
+    if (!role) throw new AppError("Role admin kantah tidak ditemukan", 404);
 
     const { publicKey, privateKey } = generateSignatureKeyPair();
     const encryptedPrivateKey = encryptPrivateKey(privateKey as string);

@@ -467,6 +467,12 @@ export const getApplication = async (id: string) => {
             share: true,
           },
         },
+        officer: {
+          select: {
+            id: true,
+            wallet_address: true,
+          },
+        },
         sellers: {
           select: {
             person: {
@@ -1122,34 +1128,32 @@ export const enqueueCertificateGeneration = async (
       data: signedRequest.data as `0x${string}`,
       signature: signedRequest.signature as `0x${string}`,
     };
-    const domain = await publicClient.readContract({
-      address: forwarderConfig.address,
-      abi: [
-        {
-          name: "eip712Domain",
-          type: "function",
-          stateMutability: "view",
-          inputs: [],
-          outputs: [
-            { name: "fields", type: "bytes1" },
-            { name: "name", type: "string" },
-            { name: "version", type: "string" },
-            { name: "chainId", type: "uint256" },
-            { name: "verifyingContract", type: "address" },
-            { name: "salt", type: "bytes32" },
-            { name: "extensions", type: "uint256[]" },
-          ],
-        },
-      ],
-      functionName: "eip712Domain",
-    } as any);
+    // await publicClient.readContract({
+    //   address: forwarderConfig.address,
+    //   abi: [
+    //     {
+    //       name: "eip712Domain",
+    //       type: "function",
+    //       stateMutability: "view",
+    //       inputs: [],
+    //       outputs: [
+    //         { name: "fields", type: "bytes1" },
+    //         { name: "name", type: "string" },
+    //         { name: "version", type: "string" },
+    //         { name: "chainId", type: "uint256" },
+    //         { name: "verifyingContract", type: "address" },
+    //         { name: "salt", type: "bytes32" },
+    //         { name: "extensions", type: "uint256[]" },
+    //       ],
+    //     },
+    //   ],
+    //   functionName: "eip712Domain",
+    // } as any);
 
-    const currentNonce = await getForwarderNonce(normalizedRequest.from);
-    console.log("nonce saat verify:", currentNonce.toString());
+    // const currentNonce = await getForwarderNonce(normalizedRequest.from);
 
     const isValid = await verifyForwardRequest(normalizedRequest);
 
-    console.log("isvalid : ", isValid);
     if (!isValid) {
       throw new AppError(
         "Signature tidak valid atau sudah kadaluarsa. Silakan tanda tangan ulang.",
@@ -1172,7 +1176,6 @@ export const enqueueCertificateGeneration = async (
     const jobPayloads = {
       fileNumber: isSuccess.file_number,
       notes,
-      // BigInt tidak bisa masuk queue JSON, kirim balik sebagai string
       signedRequest: {
         ...signedRequest,
       },

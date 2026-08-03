@@ -180,12 +180,7 @@ export const getUser = async (id: string) => {
       },
     });
 
-    const adminRoles = [
-      "kepala kanwil",
-      "admin kanwil",
-      "admin kantah",
-      "kepala kantah",
-    ];
+    const adminRoles = ["admin kantah"];
 
     const isAdmin = person?.roles.some((rp: any) =>
       adminRoles.includes(rp.role.name),

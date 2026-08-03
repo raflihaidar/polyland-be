@@ -21,6 +21,10 @@ export interface ForwardRequestData {
 interface BuildMintForwardRequestParams {
   petugasAddress: Address;
   recipientAddress: Address;
+  loketAddress: Address;
+  nib: string;
+  luasTanah: bigint;
+  jenisHak: string;
   gasLimit?: bigint;
   deadlineInSeconds?: number;
 }
@@ -76,16 +80,25 @@ export const getForwarderNonce = async (address: Address): Promise<bigint> => {
 export const buildMintForwardRequest = async ({
   petugasAddress,
   recipientAddress,
-  gasLimit = 300000n,
-  deadlineInSeconds = 3600, // 1 jam, sesuaikan dgn estimasi durasi worker
+  loketAddress,
+  nib,
+  luasTanah,
+  jenisHak,
+  gasLimit = 600000n, // dinaikkan dari 300000n: mintCertificate sekarang nulis 2 string + struct tambahan + event ekstra, jauh lebih mahal dari versi lama yang cuma nyimpen 1 address
+  deadlineInSeconds = 3600,
 }: BuildMintForwardRequestParams): Promise<ForwardRequestTypedData> => {
   const nonce = await getForwarderNonce(petugasAddress);
   const deadline = Math.floor(Date.now() / 1000) + deadlineInSeconds;
 
+  // NOTE: mintCertificate di contract cuma 5 parameter — petugas penerbit
+  // (BPN) TIDAK dikirim sebagai argumen, tapi diresolve on-chain lewat
+  // _msgSender() (dari field `from` di forward request ini). Jangan
+  // tambahkan petugasAddress ke args di bawah, contract akan revert
+  // kalau jumlah/urutan argumen tidak persis cocok dengan ABI.
   const data = encodeFunctionData({
     abi: contractConfig.abi,
     functionName: "mintCertificate",
-    args: [recipientAddress],
+    args: [recipientAddress, loketAddress, nib, luasTanah, jenisHak],
   });
 
   const domain = await getForwarderDomain();
